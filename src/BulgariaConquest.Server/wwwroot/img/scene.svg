@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+  <!-- Sunset over Balkan ridges with a medieval fortress. Palette: #171413 #4a362e #6f4b5e #b17a72 #e7a95f #f3e8d9 -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#241a22"/>
+      <stop offset="0.28" stop-color="#6f4b5e"/>
+      <stop offset="0.5" stop-color="#b17a72"/>
+      <stop offset="0.66" stop-color="#e7a95f"/>
+      <stop offset="0.74" stop-color="#f6cf94"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff1cf" stop-opacity="1"/>
+      <stop offset="0.18" stop-color="#ffd690" stop-opacity="0.9"/>
+      <stop offset="0.5" stop-color="#e7a95f" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#e7a95f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="haze" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e7a95f" stop-opacity="0"/>
+      <stop offset="1" stop-color="#e7a95f" stop-opacity="0.35"/>
+    </linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0.45" stop-color="#171413" stop-opacity="0"/>
+      <stop offset="1" stop-color="#171413" stop-opacity="0.9"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-50%" width="140%" height="200%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+  <circle cx="420" cy="640" r="320" fill="url(#sun)"/>
+
+  <!-- clouds -->
+  <g filter="url(#soft)" opacity="0.75">
+    <ellipse cx="300" cy="230" rx="260" ry="34" fill="#b17a72"/>
+    <ellipse cx="760" cy="170" rx="320" ry="40" fill="#8a5f6a"/>
+    <ellipse cx="1240" cy="260" rx="300" ry="36" fill="#b17a72"/>
+    <ellipse cx="600" cy="420" rx="360" ry="26" fill="#e7a95f" opacity="0.7"/>
+    <ellipse cx="1350" cy="470" rx="260" ry="22" fill="#e7a95f" opacity="0.6"/>
+  </g>
+
+  <!-- far ridge -->
+  <path d="M0 640 C120 600 210 560 320 585 S520 520 640 560 S840 610 980 548 S1220 500 1360 560 S1520 600 1600 570 V1000 H0Z" fill="#8a5f6a" opacity="0.75"/>
+  <rect y="520" width="1600" height="200" fill="url(#haze)"/>
+  <!-- middle ridge -->
+  <path d="M0 720 C160 670 280 690 420 660 S700 700 860 650 S1080 620 1200 600 S1420 660 1600 640 V1000 H0Z" fill="#6f4b5e"/>
+
+  <!-- fortress on the hill -->
+  <g fill="#3a2a2b">
+    <path d="M960 640 C1040 590 1160 570 1260 585 C1330 595 1380 610 1420 640 Z"/>
+    <rect x="1030" y="500" width="300" height="110"/>
+    <path d="M1030 500 v-14 h14 v14 h16 v-14 h14 v14 h16 v-14 h14 v14 h16 v-14 h14 v14 h16 v-14 h14 v14 h16 v-14 h14 v14 h16 v-14 h14 v14 h16 v-14 h14 v14 h16 v-14 h14 v14 h16 v-14 h14 v14 h16 v-14 h14 v14 Z"/>
+    <rect x="1050" y="420" width="44" height="190"/>
+    <polygon points="1044,420 1072,360 1100,420"/>
+    <rect x="1150" y="360" width="56" height="250"/>
+    <polygon points="1142,360 1178,280 1214,360"/>
+    <rect x="1258" y="440" width="40" height="170"/>
+    <polygon points="1252,440 1278,385 1304,440"/>
+    <rect x="1205" y="430" width="30" height="80"/>
+    <polygon points="1200,430 1220,392 1240,430"/>
+    <path d="M1178 280 v-40" stroke="#3a2a2b" stroke-width="3"/>
+    <path d="M1072 360 v-28" stroke="#3a2a2b" stroke-width="3"/>
+  </g>
+  <g fill="#b5524a">
+    <path d="M1179 240 l30 8 l-30 9z"/>
+    <path d="M1073 332 l22 6 l-22 7z"/>
+  </g>
+  <g fill="#f6cf94" opacity="0.85">
+    <rect x="1170" y="400" width="8" height="14" rx="4"/>
+    <rect x="1066" y="460" width="7" height="12" rx="3.5"/>
+    <rect x="1272" y="480" width="6" height="11" rx="3"/>
+    <rect x="1120" y="545" width="7" height="12" rx="3.5"/>
+    <rect x="1230" y="550" width="7" height="12" rx="3.5"/>
+  </g>
+
+  <!-- near hills -->
+  <path d="M0 820 C200 760 360 790 520 760 S820 800 980 760 S1260 720 1420 770 S1560 790 1600 780 V1000 H0Z" fill="#4a362e"/>
+  <path d="M0 900 C240 850 420 880 620 860 S980 900 1200 860 S1480 880 1600 870 V1000 H0Z" fill="#2a201d"/>
+
+  <!-- birds -->
+  <g fill="none" stroke="#3a2a2b" stroke-width="3" stroke-linecap="round">
+    <path d="M720 330 q10 -10 20 0 q10 -10 20 0"/>
+    <path d="M790 300 q7 -7 14 0 q7 -7 14 0"/>
+    <path d="M660 365 q6 -6 12 0 q6 -6 12 0"/>
+  </g>
+
+  <rect width="1600" height="1000" fill="url(#shade)"/>
+</svg>

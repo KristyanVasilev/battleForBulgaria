@@ -1,0 +1,16 @@
+{
+  "minPlayers": 3,
+  "maxPlayers": 3,
+  "towersPerCastle": 3,
+  "choiceAnswerSeconds": 15,
+  "numericAnswerSeconds": 20,
+  "turnSeconds": 30,
+  "revealSeconds": 4,
+  "conquestRounds": 6,
+  "territoryPoints": 200,
+  "castlePoints": 1000,
+  "ruinedCastlePoints": 1000,
+  "distributionPicks": [2, 1, 0],
+  "requireAdjacentClaims": true,
+  "playerColors": ["#e7a95f", "#b5524a", "#7d6ba6"]
+}

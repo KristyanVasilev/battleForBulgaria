@@ -1,0 +1,320 @@
+{
+  "provinces": [
+    {
+      "id": "blagoevgrad",
+      "iso": "BG-01",
+      "name": "Благоевград",
+      "neighbors": [
+        "kyustendil",
+        "pazardzhik",
+        "smolyan",
+        "sofia-province"
+      ]
+    },
+    {
+      "id": "burgas",
+      "iso": "BG-02",
+      "name": "Бургас",
+      "neighbors": [
+        "shumen",
+        "sliven",
+        "varna",
+        "yambol"
+      ]
+    },
+    {
+      "id": "varna",
+      "iso": "BG-03",
+      "name": "Варна",
+      "neighbors": [
+        "burgas",
+        "dobrich",
+        "shumen"
+      ]
+    },
+    {
+      "id": "veliko-tarnovo",
+      "iso": "BG-04",
+      "name": "Велико Търново",
+      "neighbors": [
+        "gabrovo",
+        "lovech",
+        "pleven",
+        "ruse",
+        "sliven",
+        "stara-zagora",
+        "targovishte"
+      ]
+    },
+    {
+      "id": "vidin",
+      "iso": "BG-05",
+      "name": "Видин",
+      "neighbors": [
+        "montana"
+      ]
+    },
+    {
+      "id": "vratsa",
+      "iso": "BG-06",
+      "name": "Враца",
+      "neighbors": [
+        "lovech",
+        "montana",
+        "pleven",
+        "sofia-province"
+      ]
+    },
+    {
+      "id": "gabrovo",
+      "iso": "BG-07",
+      "name": "Габрово",
+      "neighbors": [
+        "lovech",
+        "stara-zagora",
+        "veliko-tarnovo"
+      ]
+    },
+    {
+      "id": "dobrich",
+      "iso": "BG-08",
+      "name": "Добрич",
+      "neighbors": [
+        "shumen",
+        "silistra",
+        "varna"
+      ]
+    },
+    {
+      "id": "kardzhali",
+      "iso": "BG-09",
+      "name": "Кърджали",
+      "neighbors": [
+        "haskovo",
+        "plovdiv",
+        "smolyan"
+      ]
+    },
+    {
+      "id": "kyustendil",
+      "iso": "BG-10",
+      "name": "Кюстендил",
+      "neighbors": [
+        "blagoevgrad",
+        "pernik",
+        "sofia-province"
+      ]
+    },
+    {
+      "id": "lovech",
+      "iso": "BG-11",
+      "name": "Ловеч",
+      "neighbors": [
+        "gabrovo",
+        "pleven",
+        "plovdiv",
+        "sofia-province",
+        "veliko-tarnovo",
+        "vratsa"
+      ]
+    },
+    {
+      "id": "montana",
+      "iso": "BG-12",
+      "name": "Монтана",
+      "neighbors": [
+        "sofia-province",
+        "vidin",
+        "vratsa"
+      ]
+    },
+    {
+      "id": "pazardzhik",
+      "iso": "BG-13",
+      "name": "Пазарджик",
+      "neighbors": [
+        "blagoevgrad",
+        "plovdiv",
+        "smolyan",
+        "sofia-province"
+      ]
+    },
+    {
+      "id": "pernik",
+      "iso": "BG-14",
+      "name": "Перник",
+      "neighbors": [
+        "kyustendil",
+        "sofia-city",
+        "sofia-province"
+      ]
+    },
+    {
+      "id": "pleven",
+      "iso": "BG-15",
+      "name": "Плевен",
+      "neighbors": [
+        "lovech",
+        "veliko-tarnovo",
+        "vratsa"
+      ]
+    },
+    {
+      "id": "plovdiv",
+      "iso": "BG-16",
+      "name": "Пловдив",
+      "neighbors": [
+        "haskovo",
+        "kardzhali",
+        "lovech",
+        "pazardzhik",
+        "smolyan",
+        "sofia-province",
+        "stara-zagora"
+      ]
+    },
+    {
+      "id": "razgrad",
+      "iso": "BG-17",
+      "name": "Разград",
+      "neighbors": [
+        "ruse",
+        "shumen",
+        "silistra",
+        "targovishte"
+      ]
+    },
+    {
+      "id": "ruse",
+      "iso": "BG-18",
+      "name": "Русе",
+      "neighbors": [
+        "razgrad",
+        "silistra",
+        "targovishte",
+        "veliko-tarnovo"
+      ]
+    },
+    {
+      "id": "silistra",
+      "iso": "BG-19",
+      "name": "Силистра",
+      "neighbors": [
+        "dobrich",
+        "razgrad",
+        "ruse",
+        "shumen"
+      ]
+    },
+    {
+      "id": "sliven",
+      "iso": "BG-20",
+      "name": "Сливен",
+      "neighbors": [
+        "burgas",
+        "shumen",
+        "stara-zagora",
+        "targovishte",
+        "veliko-tarnovo",
+        "yambol"
+      ]
+    },
+    {
+      "id": "smolyan",
+      "iso": "BG-21",
+      "name": "Смолян",
+      "neighbors": [
+        "blagoevgrad",
+        "kardzhali",
+        "pazardzhik",
+        "plovdiv"
+      ]
+    },
+    {
+      "id": "sofia-city",
+      "iso": "BG-22",
+      "name": "София (град)",
+      "neighbors": [
+        "pernik",
+        "sofia-province"
+      ]
+    },
+    {
+      "id": "sofia-province",
+      "iso": "BG-23",
+      "name": "София (област)",
+      "neighbors": [
+        "blagoevgrad",
+        "kyustendil",
+        "lovech",
+        "montana",
+        "pazardzhik",
+        "pernik",
+        "plovdiv",
+        "sofia-city",
+        "vratsa"
+      ]
+    },
+    {
+      "id": "stara-zagora",
+      "iso": "BG-24",
+      "name": "Стара Загора",
+      "neighbors": [
+        "gabrovo",
+        "haskovo",
+        "plovdiv",
+        "sliven",
+        "veliko-tarnovo",
+        "yambol"
+      ]
+    },
+    {
+      "id": "targovishte",
+      "iso": "BG-25",
+      "name": "Търговище",
+      "neighbors": [
+        "razgrad",
+        "ruse",
+        "shumen",
+        "sliven",
+        "veliko-tarnovo"
+      ]
+    },
+    {
+      "id": "haskovo",
+      "iso": "BG-26",
+      "name": "Хасково",
+      "neighbors": [
+        "kardzhali",
+        "plovdiv",
+        "stara-zagora",
+        "yambol"
+      ]
+    },
+    {
+      "id": "shumen",
+      "iso": "BG-27",
+      "name": "Шумен",
+      "neighbors": [
+        "burgas",
+        "dobrich",
+        "razgrad",
+        "silistra",
+        "sliven",
+        "targovishte",
+        "varna"
+      ]
+    },
+    {
+      "id": "yambol",
+      "iso": "BG-28",
+      "name": "Ямбол",
+      "neighbors": [
+        "burgas",
+        "haskovo",
+        "sliven",
+        "stara-zagora"
+      ]
+    }
+  ]
+}

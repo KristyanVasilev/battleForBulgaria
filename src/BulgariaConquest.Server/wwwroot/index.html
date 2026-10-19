@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Битка за България</title>
+    <meta name="description" content="Стратегическа тривия игра за трима играчи върху картата на България." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♜</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap"
+    />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="conn-status" class="conn-status" role="status" aria-live="polite"></div>
+
+    <!-- ================================================================ landing -->
+    <div id="landing" class="landing">
+      <nav class="pill-nav" aria-label="Раздели">
+        <a href="#home" class="is-active">Начало</a>
+        <a href="#how">Как се играе</a>
+        <a href="#rules">Правила</a>
+        <a href="#faq">Въпроси</a>
+        <a href="#play" class="nav-play">Играй</a>
+      </nav>
+
+      <!-- hero: dark, full width -->
+      <header id="home" class="hero-section">
+        <div class="hero">
+          <p class="eyebrow">Тривия стратегия за трима</p>
+          <h1 class="hero-title">Завладей земите на <em>България</em>, <span class="nowrap">изгради своето <em>царство</em></span></h1>
+          <p class="hero-sub">
+            Отговаряй вярно, превземай области и събори кулите на противниците си.
+            28 области, трима владетели – само един ще остане на трона.
+          </p>
+
+          <div class="hero-actions" id="hero-actions">
+            <button type="button" class="btn-cta" data-open="bots">
+              Играй срещу ботове <span class="cta-arrow" aria-hidden="true">›</span>
+            </button>
+            <button type="button" class="btn-glass" data-open="friends">Игра с приятели</button>
+          </div>
+
+          <div id="lobby" class="play-card" hidden>
+            <div class="play-card-head">
+              <div class="segmented" role="tablist" aria-label="Вид игра">
+                <button type="button" role="tab" data-mode="bots" aria-selected="true">Срещу ботове</button>
+                <button type="button" role="tab" data-mode="friends" aria-selected="false">С приятели</button>
+              </div>
+              <button type="button" class="icon-btn" id="close-play" aria-label="Затвори">✕</button>
+            </div>
+
+            <label class="field">
+              <span>Твоето име</span>
+              <input id="player-name" maxlength="20" autocomplete="nickname" placeholder="напр. Хан Крум" />
+            </label>
+
+            <form id="bot-form" class="mode-pane" data-mode="bots">
+              <span class="field-label">Трудност</span>
+              <div class="choice-pills" role="radiogroup" aria-label="Трудност на ботовете">
+                <label><input type="radio" name="bot-level" value="easy" /><span>Лесни</span></label>
+                <label><input type="radio" name="bot-level" value="normal" checked /><span>Нормални</span></label>
+                <label><input type="radio" name="bot-level" value="hard" /><span>Трудни</span></label>
+              </div>
+              <button class="btn-cta wide">Започни битката <span class="cta-arrow" aria-hidden="true">›</span></button>
+            </form>
+
+            <div class="mode-pane" data-mode="friends" hidden>
+              <form id="create-form">
+                <button class="btn-cta wide">Създай игра <span class="cta-arrow" aria-hidden="true">›</span></button>
+              </form>
+              <div class="divider"><span>или влез с код</span></div>
+              <form id="join-form" class="join-row">
+                <input id="join-code" maxlength="5" placeholder="КОД" aria-label="Код на играта" />
+                <button class="btn-glass">Влез</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- how to play: light -->
+      <section id="how" class="section light">
+        <div class="container">
+          <div class="section-head">
+            <h2 class="section-label">Как се играе</h2>
+            <p class="section-lead">Четири стъпки от празната карта до трона.</p>
+          </div>
+          <ol class="steps">
+            <li>
+              <span class="step-no">I</span>
+              <h3>Замък</h3>
+              <p>Всеки избира област за своя замък с три кули. Замъците не могат да граничат.</p>
+            </li>
+            <li>
+              <span class="step-no">II</span>
+              <h3>Земи</h3>
+              <p>Числов въпрос – който е най-близо до верния отговор, избира пръв свободни области до своите.</p>
+            </li>
+            <li>
+              <span class="step-no">III</span>
+              <h3>Битки</h3>
+              <p>По ред нападате съседни вражески области. Решава въпрос с четири отговора и 15 секунди.</p>
+            </li>
+            <li>
+              <span class="step-no">IV</span>
+              <h3>Обсада</h3>
+              <p>Три победи над замък събарят кулите му – владетелят отпада, а ти взимаш всичките му земи.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- rules: light, white cards -->
+      <section id="rules" class="section light">
+        <div class="container rules-layout">
+          <div>
+            <h2 class="section-label">Правила</h2>
+            <h3 class="display-heading">Битка на знания и&nbsp;стратегия</h3>
+            <p class="body-text">
+              Всяка област е изписана на картата с точките, които носи. Пази замъка си, атакувай лидера
+              и не забравяй – бързият отговор печели при равенство.
+            </p>
+          </div>
+          <div class="rule-cards">
+            <article class="rule-card">
+              <span class="rule-icon" aria-hidden="true">#</span>
+              <div><h4>Числови въпроси</h4><p>Печели най-близкият отговор. При еднакво близки – по-бързият.</p></div>
+            </article>
+            <article class="rule-card">
+              <span class="rule-icon" aria-hidden="true">?</span>
+              <div><h4>Въпроси с избор</h4><p>Нападателят превзема само ако той е прав, а защитникът – не.</p></div>
+            </article>
+            <article class="rule-card">
+              <span class="rule-icon" aria-hidden="true">=</span>
+              <div><h4>Равенство</h4><p>Ако и двамата са прави, решава допълнителен числов въпрос.</p></div>
+            </article>
+            <article class="rule-card">
+              <span class="rule-icon" aria-hidden="true">♜</span>
+              <div><h4>Точки</h4><p>200 за област, 1000 за замък – и за руините на паднала столица.</p></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- faq: dark -->
+      <section id="faq" class="section dark">
+        <div class="container faq-layout">
+          <div>
+            <h2 class="display-title">Въпроси и <em>отговори</em></h2>
+            <div class="callout">
+              <h3>Готов за битка?</h3>
+              <p>Двама ботове чакат да изпитат знанията ти.</p>
+              <button type="button" class="btn-ink" data-open="bots">Играй сега <span aria-hidden="true">→</span></button>
+            </div>
+          </div>
+          <div class="faq-list">
+            <details open>
+              <summary>Колко играчи са нужни?</summary>
+              <p>Трима. Можеш да играеш с приятели (споделяш 5-символен код) или сам срещу двама ботове.</p>
+            </details>
+            <details>
+              <summary>Какво става, ако не отговоря навреме?</summary>
+              <p>Отговорът ти се брои за грешен. Ако не избереш област или атака, играта избира вместо теб или пропуска хода ти.</p>
+            </details>
+            <details>
+              <summary>Колко трудни са ботовете?</summary>
+              <p>Лесните отговарят вярно около 45% от времето, нормалните – 65%, трудните – 85%. Бързият човек може да ги изпревари.</p>
+            </details>
+            <details>
+              <summary>Как се печели?</summary>
+              <p>След последния рунд печели играчът с най-много точки. Ако загубиш замъка си, отпадаш веднага.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- call to action: cream card on dark -->
+      <section id="play" class="section dark cta-section">
+        <div class="container">
+          <div class="cta-card">
+            <div>
+              <h2 class="display-heading">Царството чака своя владетел</h2>
+              <p class="body-text">Избери противници и поведи битката за 28-те области на България.</p>
+            </div>
+            <div class="cta-actions">
+              <button type="button" class="btn-ink" data-open="bots">Срещу ботове <span aria-hidden="true">→</span></button>
+              <button type="button" class="btn-outline" data-open="friends">С приятели</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="site-footer">
+        <div class="container footer-row">
+          <div class="brand"><span class="brand-mark" aria-hidden="true">♜</span><span>Битка за България</span></div>
+          <nav class="footer-links" aria-label="Долно меню">
+            <a href="#how">Как се играе</a>
+            <a href="#rules">Правила</a>
+            <a href="#faq">Въпроси</a>
+          </nav>
+          <p class="footer-note">Тривия стратегия · 28 области · 3 владетели</p>
+        </div>
+      </footer>
+    </div>
+
+    <!-- ================================================================ game -->
+    <!-- The map fills the whole screen; every panel is a HUD piece laid over it. -->
+    <div id="game-screen" class="game" hidden>
+      <section class="map-stage">
+        <div id="map" class="map"></div>
+        <div id="map-tip" class="map-tip" hidden></div>
+        <div id="question" class="question" hidden aria-live="polite"></div>
+        <div id="game-over" class="question" hidden></div>
+      </section>
+
+      <!-- top left: chat, input on top like the original game -->
+      <section class="hud hud-chat chat-card" aria-label="Чат">
+        <form id="chat-form" class="chat-form">
+          <input id="chat-input" maxlength="200" autocomplete="off" placeholder="Напиши съобщение…" aria-label="Съобщение" />
+          <button class="chat-send" aria-label="Изпрати">➤</button>
+        </form>
+        <ol id="chat" class="chat" aria-live="polite"></ol>
+      </section>
+
+      <!-- top right: whose turn it is, exit -->
+      <header class="hud-top">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">♜</span><span>Битка за България</span></div>
+        <div id="status" class="status-pill" aria-live="polite"></div>
+        <button type="button" id="sound-btn" class="btn-glass small sound-btn" aria-label="Звук"></button>
+        <button type="button" id="leave-btn" class="btn-glass small">Изход</button>
+      </header>
+
+      <section id="game-panel" class="hud hud-lobby game-card">
+        <div class="code-row">
+          <div>
+            <span class="micro" id="game-kind">Код на играта</span>
+            <div id="game-code" class="game-code"></div>
+          </div>
+          <button type="button" id="copy-link-btn" class="btn-glass small">Покани</button>
+        </div>
+        <p id="lobby-hint" class="small"></p>
+        <button type="button" id="start-btn" class="btn-cta wide" hidden>Започни играта <span class="cta-arrow" aria-hidden="true">›</span></button>
+        <button type="button" id="new-game-btn" class="btn-glass wide" hidden>Нова игра</button>
+      </section>
+
+      <!-- bottom left: jokers -->
+      <section class="hud hud-jokers jokers-card" aria-label="Жокери">
+        <h2 class="hud-title">Жокери</h2>
+        <div id="jokers" class="jokers"></div>
+        <div id="theme-picker" class="q-picker" hidden></div>
+        <p id="joker-hint" class="joker-hint"></p>
+      </section>
+
+      <!-- bottom centre: standings as a podium (1st in the middle, 2nd left, 3rd right) -->
+      <div id="scoreboard" class="podium" aria-label="Класиране на играчите"></div>
+
+      <!-- bottom right: phase and rounds -->
+      <section class="hud hud-rounds" aria-label="Фаза и рундове">
+        <h2 id="phase-title" class="phase-title"></h2>
+        <div id="rounds" class="rounds"></div>
+      </section>
+    </div>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
