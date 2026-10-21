@@ -24,10 +24,12 @@ let latest = null; // last view received, even before we know our session
 let clockOffset = 0;
 let hovered = null;
 let gameOverDismissed = null; // game id whose final standings the player closed
+let shownIntro = false; // whether the last render showed a question intro (the question itself still hidden)
 // What my lifelines revealed on the current question (private – only this browser has it).
 const lifelines = { question: null, results: [], restoring: false };
 
 const me = () => session?.playerId ?? null;
+const provinceName = (id) => (map.province(id)?.name ?? id).replace(" (град)", "");
 
 // ------------------------------------------------------------------ rendering
 
@@ -37,7 +39,9 @@ function render() {
   ui.renderScoreboard(game, me());
   ui.renderRounds(game);
   ui.renderChat(game, me());
-  ui.renderQuestion(game, me(), answer);
+  ui.renderAnnouncer(game, me(), provinceName);
+  ui.renderQuestion(game, me(), answer, provinceName);
+  shownIntro = ui.inIntro(game?.question);
   ui.applyLifelines(game, lifelines.results);
   ui.renderJokers($("#jokers"), game, me(), useLifeline);
   ui.renderJokers($("#question .q-jokers"), game, me(), useLifeline, { compact: true });
@@ -51,7 +55,8 @@ function render() {
     players: game?.players,
     targets: myTurn ? game.options.provinces : [],
     targetKind: game?.options?.kind,
-    battleProvince: game?.battle?.provinceId,
+    battle: game?.battle,
+    turnPlayer: game && game.phase !== "finished" ? ui.activePlayerId(game) : null,
     points: game?.provincePoints,
   });
 
@@ -88,7 +93,9 @@ function apply(view) {
   if (game && view.id === game.id && view.version < game.version) return; // stale update
   game = view;
   clockOffset = Date.parse(view.serverNow) - Date.now();
+  ui.setClockOffset(clockOffset);
   render();
+  questionClock();
 }
 
 conn.onUpdate((view) => {
@@ -102,6 +109,8 @@ conn.onStatus((status) => {
 });
 
 setInterval(() => {
+  // The question appears when its intro is over – no server message marks that moment.
+  if (ui.inIntro(game?.question) !== shownIntro) render();
   ui.tickTimers(clockOffset);
   questionClock();
 }, 200);
@@ -110,28 +119,44 @@ setInterval(() => {
 
 const TICK_SECONDS = 8; // the clock starts ticking this many seconds before the answer time runs out
 const URGENT_SECONDS = 3;
-const clock = { key: null, second: null, gong: false };
+const clock = { key: null, second: null, gong: false, seenRunning: false };
 
-/** Ticks during the last seconds of a question I still have to answer, and a gong when time is up. */
+/**
+ * Ticks during the last seconds of a question I still have to answer, and a gong when its time runs out.
+ * The gong plays once per question: when the local countdown reaches zero, or – if the server closed the
+ * question first (clocks differ a little, timers sleep in background tabs) – when the result arrives with
+ * someone still unanswered.
+ */
 function questionClock() {
   const q = game?.question;
-  const mustAnswer = !!q && !q.revealed && q.participants.includes(me()) && !q.answered.includes(me());
-  if (!mustAnswer) return;
+  if (!q) return;
 
   const key = `${game.id}|${q.startedAt}`;
-  if (clock.key !== key) Object.assign(clock, { key, second: null, gong: false });
+  if (clock.key !== key) Object.assign(clock, { key, second: null, gong: false, seenRunning: false });
+  if (clock.gong) return;
 
-  const left = ui.secondsLeft(q.deadline, clockOffset);
-  if (left <= 0) {
-    if (!clock.gong) sound.timeUp();
-    clock.gong = true;
+  if (q.revealed) {
+    const timedOut = q.participants.some((pid) => !q.answers?.[pid]);
+    if (timedOut && clock.seenRunning) gong();
     return;
   }
+  if (ui.inIntro(q)) return;
+  clock.seenRunning = true;
+
+  const left = ui.secondsLeft(q.deadline, clockOffset);
+  if (left <= 0) return gong();
+
+  const mustAnswer = q.participants.includes(me()) && !q.answered.includes(me());
   const second = Math.ceil(left);
-  if (second <= TICK_SECONDS && second !== clock.second) {
+  if (mustAnswer && second <= TICK_SECONDS && second !== clock.second) {
     clock.second = second;
     sound.tick(second <= URGENT_SECONDS, second % 2 === 0);
   }
+}
+
+function gong() {
+  clock.gong = true;
+  sound.timeUp();
 }
 
 function renderSoundButton() {

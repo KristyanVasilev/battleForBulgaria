@@ -992,38 +992,64 @@ input:focus {
   width: var(--side-w);
 }
 
-/* bottom right: phase and rounds */
+/* bottom right: phase, rounds and the order of play */
 .hud-rounds {
   bottom: var(--hud-gap);
   right: var(--hud-gap);
   width: var(--side-w);
-  padding: 0.65rem 0.9rem 0.8rem;
+  padding: 0.8rem 1rem 0.9rem;
 }
 
 .phase-title {
-  margin: 0 0 0.55rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0 0 0.7rem;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.45rem;
+  font-size: 1.6rem;
   line-height: 1.1;
   color: var(--cream);
   text-shadow: 0 0 14px rgba(231, 169, 95, 0.45);
 }
 
+.round-count {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: none;
+  white-space: nowrap;
+}
+
 .rounds {
   display: flex;
-  gap: 6px;
+  gap: 7px;
 }
 
 .round {
   flex: 1;
   display: grid;
+  justify-items: center;
   gap: 5px;
 }
 
+.round-no {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-faint);
+  line-height: 1;
+}
+
+.round.is-current .round-no {
+  color: var(--amber);
+}
+
 .round-lamp {
-  height: 10px;
-  border-radius: 3px;
+  width: 100%;
+  height: 14px;
+  border-radius: 4px;
   background: rgba(0, 0, 0, 0.45);
   border: 1px solid rgba(217, 177, 108, 0.28);
 }
@@ -1045,7 +1071,7 @@ input:focus {
   }
 }
 
-/* one slanted tick per player and round, in turn order */
+/* one slanted tick per player and round, in that round's attack order */
 .round-turns {
   display: flex;
   justify-content: center;
@@ -1053,26 +1079,125 @@ input:focus {
 }
 
 .round-turns i {
-  width: 4px;
-  height: 12px;
-  border-radius: 1px;
+  width: 7px;
+  height: 17px;
+  border-radius: 2px;
   background: var(--player-color);
-  transform: skewX(-18deg);
-  opacity: 0.3;
+  transform: skewX(-14deg);
+  opacity: 0.35;
+}
+
+.round-turns i.is-unknown {
+  background: rgba(246, 239, 228, 0.25);
+  opacity: 0.4;
 }
 
 .round-turns i.is-done {
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 .round-turns i.is-now {
   opacity: 1;
-  box-shadow: 0 0 6px 1px var(--player-color);
-  transform: skewX(-18deg) scaleY(1.25);
+  box-shadow: 0 0 8px 2px var(--player-color);
+  transform: skewX(-14deg) scaleY(1.25);
+  animation: tick-now 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes tick-now {
+  to {
+    box-shadow: 0 0 2px 0 var(--player-color);
+  }
 }
 
 .round-turns i.is-out {
   opacity: 0.08;
+}
+
+/* the current round's order as a list */
+.turn-order {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.turn-order:empty {
+  display: none;
+}
+
+.turn-caption {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.turn-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid transparent;
+  border-left: 4px solid var(--player-color);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.turn-no {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  background: var(--player-color);
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.turn-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.turn-mark {
+  flex: none;
+  font-weight: 800;
+  color: var(--text-soft);
+}
+
+.turn-row.is-done {
+  opacity: 0.55;
+}
+
+.turn-row.is-out {
+  opacity: 0.3;
+  text-decoration: line-through;
+}
+
+.turn-row.is-now {
+  background: color-mix(in srgb, var(--player-color) 26%, rgba(0, 0, 0, 0.3));
+  border-color: var(--player-color);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--player-color) 55%, transparent);
+}
+
+.turn-row.is-now .turn-mark {
+  color: var(--player-color);
+  animation: nudge 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes nudge {
+  to {
+    transform: translateX(-4px);
+  }
 }
 
 /* ---------------------------------------------------------------- podium (bottom centre) */
@@ -1642,23 +1767,228 @@ input:focus {
   font-size: 7.4px;
 }
 
-.castle {
+/* the land of the player whose turn it is breathes */
+.province.is-turn {
+  animation: turn-glow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes turn-glow {
+  from {
+    filter: brightness(1);
+  }
+  to {
+    filter: brightness(1.22) saturate(1.15);
+  }
+}
+
+/* a province that just changed hands flashes */
+.province.is-captured {
+  animation: captured 1.5s ease-out;
+}
+
+@keyframes captured {
+  0%,
+  30% {
+    filter: brightness(1.9) saturate(1.4);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+/* capital: stone castle with towers in the owner's colour, the owner's name on a ribbon below */
+.capital {
   pointer-events: none;
+}
+
+.castle {
+  stroke: var(--ink);
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1.5px 1.2px rgba(0, 0, 0, 0.55));
+}
+
+.castle-aura {
+  fill: url(#castle-aura);
+  stroke: none;
+}
+
+.castle-shadow {
+  fill: rgba(0, 0, 0, 0.35);
+  stroke: none;
+}
+
+.castle .stone {
+  fill: #f1e6d2;
+}
+
+.castle .roof,
+.castle .banner {
+  fill: var(--castle-color, #888);
+}
+
+.castle .roof {
+  stroke-width: 1;
+}
+
+.castle .pole {
+  stroke-width: 1;
+}
+
+.castle .window,
+.castle .gate {
+  fill: #2a201d;
+  stroke: none;
+}
+
+.castle .tower.is-lost .stone {
+  fill: rgba(241, 230, 210, 0.15);
+  stroke-dasharray: 2 1.6;
+  stroke-opacity: 0.7;
+}
+
+.castle .tower.is-lost :is(.roof, .window, .banner, .pole) {
+  display: none;
+}
+
+.castle.is-turn .castle-aura {
+  animation: aura 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes aura {
+  to {
+    opacity: 0.35;
+  }
+}
+
+/* ruins of a fallen castle */
+.castle.is-fallen {
+  opacity: 0.7;
+}
+
+.castle.is-fallen .stone {
+  fill: #a0968a;
+}
+
+.castle.is-fallen .castle-aura {
+  display: none;
+}
+
+.capital-name rect {
   fill: var(--castle-color, #888);
   stroke: var(--ink);
-  stroke-width: 1.4;
-  stroke-linejoin: round;
+  stroke-width: 0.8;
   filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
 }
 
-.castle .tower.is-lost {
-  fill: none;
-  stroke-dasharray: 2 2;
-  stroke-opacity: 0.6;
+.capital-name text {
+  font-family: var(--font-body);
+  font-size: 6px;
+  font-weight: 800;
+  text-anchor: middle;
+  fill: #1a1310;
+  stroke: rgba(255, 250, 240, 0.45);
+  stroke-width: 1.2px;
+  paint-order: stroke;
 }
 
-.castle.is-fallen {
-  opacity: 0.4;
+/* attack: a sword flies from the attacker's land to the province under attack */
+.fx {
+  pointer-events: none;
+}
+
+.attack {
+  transition: opacity 0.35s;
+}
+
+.attack.is-leaving {
+  opacity: 0;
+}
+
+.attack-trail {
+  fill: none;
+  stroke: var(--attack-color);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-dasharray: 6 5;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+  animation: march 0.8s linear infinite;
+}
+
+.attack-origin {
+  fill: var(--attack-color);
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+.attack-impact {
+  fill: none;
+  stroke: #fff1d6;
+  stroke-width: 2;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.attack.is-struck .attack-impact {
+  animation: impact 1.4s ease-out infinite;
+}
+
+.attack.is-struck .attack-impact.late {
+  animation-delay: 0.7s;
+}
+
+@keyframes impact {
+  from {
+    opacity: 0.95;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+
+.sword {
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.6));
+}
+
+.sword .blade {
+  fill: #eef2f5;
+  stroke: #2a201d;
+  stroke-width: 1;
+}
+
+.sword .fuller {
+  stroke: #9aa7b0;
+  stroke-width: 1;
+}
+
+.sword .guard {
+  fill: var(--gold);
+  stroke: #2a201d;
+  stroke-width: 1;
+}
+
+.sword .grip {
+  fill: var(--attack-color);
+  stroke: #2a201d;
+  stroke-width: 0.8;
+}
+
+/* once it has landed, the sword keeps stabbing */
+.attack.is-struck .sword-body {
+  animation: stab 0.9s ease-in-out infinite;
+}
+
+@keyframes stab {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }
 
 /* ---------------------------------------------------------------- question + game over (dark cards) */
@@ -2536,5 +2866,346 @@ input:focus {
 @media (hover: none) {
   .map-tip {
     display: none !important;
+  }
+}
+
+/* ---------------------------------------------------------------- turn indicator, announcer, answer colours */
+
+/* top bar pill in the colour of the player whose turn it is */
+.status-pill.has-turn {
+  border-color: var(--player-color);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--player-color) 30%, transparent), transparent 70%),
+    rgba(32, 21, 16, 0.92);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--player-color) 50%, transparent), 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.status-pill.is-mine {
+  animation: mine-glow 1.1s ease-in-out infinite alternate;
+}
+
+.status-pill.is-mine strong {
+  color: var(--cream);
+}
+
+@keyframes mine-glow {
+  from {
+    box-shadow: 0 0 0 1px var(--player-color), 0 0 6px color-mix(in srgb, var(--player-color) 50%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 2px var(--player-color), 0 0 26px var(--player-color);
+  }
+}
+
+.status-pill.is-passing {
+  animation: pill-pop 0.6s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.status-pill.is-mine.is-passing {
+  animation: pill-pop 0.6s cubic-bezier(0.2, 1.6, 0.4, 1), mine-glow 1.1s 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes pill-pop {
+  from {
+    transform: scale(0.88);
+  }
+}
+
+.turn-crest {
+  position: relative;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-left: -0.55rem;
+  border-radius: 50%;
+  background: var(--player-color);
+  color: var(--ink);
+  font-size: 0.95rem;
+  box-shadow: 0 0 0 2px rgba(23, 20, 19, 0.9);
+}
+
+/* a ring keeps spreading out of the crest */
+.turn-crest::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 2px solid var(--player-color);
+  animation: ring 1.4s ease-out infinite;
+}
+
+@keyframes ring {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+/* the player on the move: an arrow bobs above their podium step */
+.plate.is-current::before {
+  content: "▼";
+  position: absolute;
+  top: -1.35rem;
+  left: 50%;
+  translate: -50% 0;
+  color: var(--player-color);
+  font-size: 1.05rem;
+  text-shadow: 0 0 8px var(--player-color), 0 2px 4px rgba(0, 0, 0, 0.8);
+  animation: bob 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes bob {
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+/* big banner over the map: "X напада Y" before a question, "Ход на …" when the turn passes */
+.announce {
+  position: absolute;
+  z-index: 8;
+  left: 50%;
+  top: calc(var(--top-h, 0px) + 6%);
+  translate: -50% 0;
+  width: max-content;
+  max-width: min(560px, calc(100% - 2 * var(--side, 1rem)));
+  pointer-events: none;
+}
+
+.announce-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.85rem 1.4rem 0.85rem 1rem;
+  border-radius: 18px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--player-color) 38%, transparent), transparent 75%),
+    rgba(23, 18, 15, 0.94);
+  border: 2px solid var(--player-color);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--player-color) 55%, transparent), var(--shadow);
+  color: var(--cream);
+  animation: announce-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+.announce-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 50%;
+  background: var(--player-color);
+  color: var(--ink);
+  font-size: 1.5rem;
+  box-shadow: 0 0 0 3px rgba(23, 20, 19, 0.85);
+}
+
+.announce.is-intro .announce-icon {
+  animation: clash 0.7s ease-in-out infinite alternate;
+}
+
+@keyframes clash {
+  to {
+    transform: rotate(-14deg) scale(1.1);
+  }
+}
+
+.announce-text {
+  display: grid;
+  min-width: 0;
+}
+
+.announce-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.2rem, 2.3vw, 1.75rem);
+  line-height: 1.15;
+}
+
+.announce-sub {
+  color: var(--text-soft);
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.announce.is-mine .announce-title {
+  color: var(--player-color);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--player-color) 70%, transparent);
+}
+
+.announce.is-leaving {
+  transition: opacity 0.3s, transform 0.3s;
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+@keyframes announce-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.85);
+  }
+}
+
+/* question overlay fades in and out instead of jumping */
+.question:not([hidden]) {
+  animation: fade-in 0.3s ease-out;
+}
+
+.question.is-leaving {
+  transition: opacity 0.3s;
+  opacity: 0;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.question-card.is-revealed {
+  animation: none;
+}
+
+/* who has answered so far (not what) */
+.q-who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.who-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--player-color) 55%, transparent);
+  color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.who-chip .dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--player-color);
+  opacity: 0.4;
+}
+
+.who-chip.is-done {
+  background: color-mix(in srgb, var(--player-color) 28%, transparent);
+  color: var(--cream);
+}
+
+.who-chip.is-done .dot {
+  opacity: 1;
+}
+
+/* after the reveal: every pick in the colour of the player who made it */
+.option {
+  position: relative;
+  overflow: hidden;
+}
+
+.option.is-picked {
+  padding-left: 1.2rem;
+  border-color: var(--pick-color);
+  border-width: 2px;
+}
+
+.option.is-picked::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 7px;
+  background: var(--pick-bands);
+}
+
+.option-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.option .picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.pick-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.55rem;
+  border-radius: 999px;
+  background: var(--player-color);
+  color: var(--ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  animation: chip-in 0.35s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+.pick-chip:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+.pick-chip:nth-child(3) {
+  animation-delay: 0.16s;
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+.ranking li.is-player {
+  border-left: 4px solid var(--player-color);
+}
+
+.ranking li.is-player .grow {
+  color: color-mix(in srgb, var(--player-color) 70%, white);
+}
+
+.rank-answer {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* during the reveal: how long until the game moves on */
+.q-timer.is-next {
+  height: 4px;
+  margin-top: 0.8rem;
+}
+
+.q-timer.is-next .bar,
+.q-timer.is-next .bar.is-low {
+  background: rgba(217, 177, 108, 0.6);
+}
+
+@media (max-width: 1000px) {
+  .announce {
+    top: 8px;
+    max-width: calc(100% - 16px);
+  }
+
+  .announce-card {
+    gap: 0.6rem;
+    padding: 0.5rem 0.9rem 0.5rem 0.6rem;
+  }
+
+  .announce-icon {
+    width: 2.1rem;
+    height: 2.1rem;
+    font-size: 1.1rem;
   }
 }

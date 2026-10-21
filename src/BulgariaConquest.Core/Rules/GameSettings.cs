@@ -15,13 +15,22 @@ public sealed record GameSettings
     /// <summary>Time to pick a castle / claim a province / declare an attack before the server acts.</summary>
     public int TurnSeconds { get; init; } = 30;
 
-    /// <summary>How long the correct answer is shown before the game moves on.</summary>
-    public int RevealSeconds { get; init; } = 4;
+    /// <summary>How long the correct answer (and everyone's pick) is shown before the game moves on.</summary>
+    public int RevealSeconds { get; init; } = 6;
+
+    /// <summary>
+    /// Pause between announcing a question (e.g. "X attacks Y") and showing it, so players see what is
+    /// at stake on the map. The answer timer starts after it.
+    /// </summary>
+    public double QuestionIntroSeconds { get; init; } = 2.5;
 
     /// <summary>Full rotations of attacks (every active player attacks once per round).</summary>
     public int ConquestRounds { get; init; } = 6;
 
     public int TerritoryPoints { get; init; } = 200;
+
+    /// <summary>A province taken in battle (conquest phase) is worth this much to whoever holds it.</summary>
+    public int ConqueredTerritoryPoints { get; init; } = 400;
     public int CastlePoints { get; init; } = 1000;
 
     /// <summary>A fallen castle ("old capital") keeps its value for whoever holds the ruins.</summary>
@@ -33,5 +42,5 @@ public sealed record GameSettings
     /// <summary>When true, claims must border your own land (if any such free province exists).</summary>
     public bool RequireAdjacentClaims { get; init; } = true;
 
-    public string[] PlayerColors { get; init; } = ["#e7a95f", "#b5524a", "#7d6ba6"];
+    public string[] PlayerColors { get; init; } = ["#e7a95f", "#b5524a", "#7d6ba6", "#4f9a8a", "#4f7fb8"];
 }

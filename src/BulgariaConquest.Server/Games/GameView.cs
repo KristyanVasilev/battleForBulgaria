@@ -15,6 +15,8 @@ public sealed record GameView(
     DateTimeOffset ServerNow,
     DateTimeOffset? ActionDeadline,
     string? CurrentPlayerId,
+    IReadOnlyList<string> TurnOrder,
+    IReadOnlyList<IReadOnlyList<string>> RoundOrders,
     IReadOnlyList<PlayerView> Players,
     IReadOnlyDictionary<string, string?> Owners,
     IReadOnlyDictionary<string, int> ProvincePoints,
@@ -38,6 +40,8 @@ public sealed record GameView(
             now,
             game.ActionDeadline,
             current,
+            game.TurnOrder,
+            game.RoundOrders,
             game.Players.Select(p => new PlayerView(
                 p.Id, p.Name, p.Color, p.CastleProvinceId, p.Towers, game.Settings.TowersPerCastle,
                 p.IsEliminated, engine.Score(game, p.Id), game.ProvincesOf(p.Id).Count(), p.BotLevel,
@@ -83,6 +87,8 @@ public sealed record QuestionView(
     DateTimeOffset StartedAt,
     DateTimeOffset Deadline,
     bool Revealed,
+    DateTimeOffset? RevealedAt,
+    DateTimeOffset? RevealUntil,
     int? CorrectIndex,
     double? CorrectNumber,
     IReadOnlyDictionary<string, AnswerView>? Answers,
@@ -95,7 +101,7 @@ public sealed record QuestionView(
         var revealed = q.IsResolved;
         return new QuestionView(
             q.Kind, q.Purpose, q.Text, q.Category, q.Difficulty, q.Options, q.Unit, q.Participants,
-            q.Answers.Keys.ToList(), q.StartedAt, q.Deadline, revealed,
+            q.Answers.Keys.ToList(), q.StartedAt, q.Deadline, revealed, q.RevealedAt, q.RevealUntil,
             revealed ? q.CorrectIndex : null,
             revealed ? q.CorrectNumber : null,
             revealed ? q.Answers.ToDictionary(a => a.Key, a => new AnswerView(a.Value.Number, a.Value.Choice, a.Value.ResponseMs)) : null,

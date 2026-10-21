@@ -134,6 +134,7 @@ public class LifelineAndChatTests
         engine.ClaimProvince(game, "p1", "f");
         engine.ClaimProvince(game, "p2", "d");
         Assert.Equal(GamePhase.Conquest, game.Phase);
+        WaitForTurn(engine, game, "p1"); // the attack order is shuffled
 
         Assert.Throws<GameRuleException>(() => engine.UseLifeline(game, "p2", LifelineKind.Category, "Спорт"));      // not p2's turn
         Assert.Throws<GameRuleException>(() => engine.UseLifeline(game, "p1", LifelineKind.Category, "Кулинария")); // no such theme
@@ -181,8 +182,19 @@ public class LifelineAndChatTests
         _engine.ClaimProvince(_game, "p1", "f");
         _engine.ClaimProvince(_game, "p2", "d");
 
+        WaitForTurn(_engine, _game, "p1");
         _engine.Attack(_game, "p1", "c");
         return _game.Question!;
+    }
+
+    /// <summary>The conquest order is random: let the others' turns time out until it is the player's turn.</summary>
+    private void WaitForTurn(GameEngine engine, GameState game, string playerId)
+    {
+        while (engine.CurrentPlayerId(game) != playerId)
+        {
+            _time.Advance(TimeSpan.FromSeconds(game.Settings.TurnSeconds + 1));
+            Assert.True(engine.Tick(game));
+        }
     }
 
     private sealed class ThemedQuestions : IQuestionProvider

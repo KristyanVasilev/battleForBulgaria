@@ -103,7 +103,7 @@
             <li>
               <span class="step-no">III</span>
               <h3>Битки</h3>
-              <p>По ред нападате съседни вражески области. Решава въпрос с четири отговора и 15 секунди.</p>
+              <p>Всеки рунд редът на атаките се тегли наново. Решава въпрос с четири отговора и 15 секунди.</p>
             </li>
             <li>
               <span class="step-no">IV</span>
@@ -140,7 +140,7 @@
             </article>
             <article class="rule-card">
               <span class="rule-icon" aria-hidden="true">♜</span>
-              <div><h4>Точки</h4><p>200 за област, 1000 за замък – и за руините на паднала столица.</p></div>
+              <div><h4>Точки</h4><p>200 за област, 400 за превзета в битка, 1000 за замък – и за руините на паднала столица.</p></div>
             </article>
           </div>
         </div>
@@ -213,6 +213,7 @@
       <section class="map-stage">
         <div id="map" class="map"></div>
         <div id="map-tip" class="map-tip" hidden></div>
+        <div id="announce" class="announce" hidden aria-live="polite"></div>
         <div id="question" class="question" hidden aria-live="polite"></div>
         <div id="game-over" class="question" hidden></div>
       </section>
@@ -262,6 +263,7 @@
       <section class="hud hud-rounds" aria-label="Фаза и рундове">
         <h2 id="phase-title" class="phase-title"></h2>
         <div id="rounds" class="rounds"></div>
+        <ol id="turn-order" class="turn-order"></ol>
       </section>
     </div>
 

@@ -8,6 +8,11 @@
 
 const SVG = "http://www.w3.org/2000/svg";
 
+const LABEL_SIZE = 8.5; // font size of the province names (keep in sync with .label in style.css)
+const CASTLE_SCALE = 0.7;
+const RIBBON_MAX = 54; // widest owner name ribbon, in map units
+const SWORD_FLIGHT_MS = 1100;
+
 function el(name, attrs = {}, parent = null) {
   const node = document.createElementNS(SVG, name);
   for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
@@ -15,17 +20,72 @@ function el(name, attrs = {}, parent = null) {
   return node;
 }
 
+/** A crenellated block from x0 to x1: `n` (odd) alternating merlons and gaps, `h` deep. */
+function battlements(x0, x1, top, bottom, h, n) {
+  const w = (x1 - x0) / n;
+  let d = `M${x0} ${bottom} V${top}`;
+  for (let i = 0; i < n; i++) {
+    d += ` h${w}`;
+    if (i < n - 1) d += ` v${i % 2 === 0 ? h : -h}`;
+  }
+  return `${d} V${bottom} Z`;
+}
+
+/**
+ * A stone castle: a crenellated keep with the owner's banner between two round-roofed towers,
+ * on a curtain wall with a gate. Drawn in a 40 × 38 box whose ground line is y = 34.
+ * Towers are listed in the order they fall: side towers first, the keep last.
+ */
+function buildCastle(parent) {
+  const c = el("g", { class: "castle" }, parent);
+  el("circle", { cx: 20, cy: 20, r: 23, class: "castle-aura" }, c);
+  el("ellipse", { cx: 20, cy: 34.5, rx: 19, ry: 2.4, class: "castle-shadow" }, c);
+  el("path", { d: battlements(8, 32, 18, 34, 2.2, 7), class: "stone" }, c);
+
+  const side = (x, cls) => {
+    const t = el("g", { class: `tower ${cls}` }, c);
+    el("rect", { x, y: 11, width: 10, height: 23, class: "stone" }, t);
+    el("path", { d: `M${x - 1.3} 11.6 L${x + 5} 1.6 L${x + 11.3} 11.6 Z`, class: "roof" }, t);
+    el("rect", { x: x + 3.8, y: 17, width: 2.4, height: 4.2, rx: 1.2, class: "window" }, t);
+    return t;
+  };
+  const left = side(2.5, "tower-left");
+  const right = side(27.5, "tower-right");
+
+  const keep = el("g", { class: "tower tower-keep" }, c);
+  el("line", { x1: 20, y1: 6.5, x2: 20, y2: -3.5, class: "pole" }, keep);
+  el("path", { d: "M20.4 -3.5 L29 -1 L20.4 1.5 Z", class: "banner" }, keep);
+  el("path", { d: battlements(13.5, 26.5, 6, 34, 2.6, 5), class: "stone" }, keep);
+  el("rect", { x: 18.8, y: 12, width: 2.4, height: 4.2, rx: 1.2, class: "window" }, keep);
+  el("path", { d: "M16.6 34 V27.6 a3.4 3.4 0 0 1 6.8 0 V34 Z", class: "gate" }, c);
+
+  c.towers = [keep, left, right];
+  return c;
+}
+
+/** Name shortened to `max` characters with an ellipsis. */
+function shorten(name, max) {
+  return name.length <= max ? name : `${name.slice(0, max - 1).trimEnd()}…`;
+}
+
+const easeInOut = (t) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
 export class BulgariaMap extends EventTarget {
   #svg;
   #paths = new Map();
   #labels = new Map();
   #castles = new Map();
+  #ribbons = new Map();
   #points = new Map();
+  #centers = new Map();
   #overlay;
+  #fx;
   #hoverOutline;
   #selectedOutline;
   #provinces;
   #selected = null;
+  #owners = null; // owners at the last setState, to spot captured provinces
+  #attack = null; // { key, node, frame }
 
   constructor(container, geometry, provinces) {
     super();
@@ -52,6 +112,9 @@ export class BulgariaMap extends EventTarget {
     const defs = el("defs", {}, svg);
     const shadow = el("filter", { id: "map-shadow", x: "-10%", y: "-10%", width: "120%", height: "130%" }, defs);
     el("feDropShadow", { dx: "0", dy: "4", stdDeviation: "5", "flood-color": "#000", "flood-opacity": "0.35" }, shadow);
+    const aura = el("radialGradient", { id: "castle-aura" }, defs);
+    el("stop", { offset: "0", "stop-color": "#fff6df", "stop-opacity": "0.75" }, aura);
+    el("stop", { offset: "1", "stop-color": "#fff6df", "stop-opacity": "0" }, aura);
 
     const land = el("g", { class: "land", filter: "url(#map-shadow)" }, svg);
     for (const g of geometry.provinces) {
@@ -60,6 +123,7 @@ export class BulgariaMap extends EventTarget {
       const title = el("title", {}, path);
       title.textContent = info?.name ?? g.id;
       this.#paths.set(g.id, path);
+      this.#centers.set(g.id, { x: g.labelX, y: g.labelY });
 
       path.addEventListener("pointerenter", () => this.#hover(g.id));
       path.addEventListener("pointerleave", () => this.#hover(null));
@@ -91,19 +155,25 @@ export class BulgariaMap extends EventTarget {
       this.#labels.set(g.id, text);
 
       // Point value under the name (filled in by setState).
-      const ptsY = g.labelY + (0.35 + 0.55 * (lines.length - 1)) * 8.5 + 8.5;
+      const ptsY = g.labelY + (0.35 + 0.55 * (lines.length - 1)) * LABEL_SIZE + LABEL_SIZE;
       const pts = el("text", { x: g.labelX, y: ptsY, class: "pts" }, labels);
       this.#points.set(g.id, pts);
 
-      // Castle: a wall with three towers; each tower can be shown as knocked down.
-      const c = el("g", { class: "castle", transform: `translate(${g.labelX - 11} ${g.labelY - 30}) scale(0.75)` }, castles);
-      el("rect", { x: "3", y: "12", width: "24", height: "11", rx: "1", class: "wall" }, c);
-      for (const [i, x] of [2, 11.5, 21].entries()) {
-        el("path", { d: `M${x} 13 V4 h2 v2 h1.5 v-2 h1.5 v2 h2 v9 Z`, class: `tower tower-${i}` }, c);
-      }
-      c.style.display = "none";
-      this.#castles.set(g.id, c);
+      // Castle above the name, with the owner's name on a ribbon at its foot.
+      const nameTop = g.labelY + (0.35 - 0.55 * (lines.length - 1)) * LABEL_SIZE - 6.4;
+      const ribbonTop = nameTop - 9.5;
+      const holder = el("g", { class: "capital", transform: `translate(${g.labelX} ${ribbonTop})` }, castles);
+      const castle = buildCastle(holder);
+      castle.setAttribute("transform", `translate(${-20 * CASTLE_SCALE} ${2 - 34 * CASTLE_SCALE}) scale(${CASTLE_SCALE})`);
+      const ribbon = el("g", { class: "capital-name" }, holder);
+      el("rect", { y: 0, height: 8.5, rx: 2.2 }, ribbon);
+      el("text", { x: 0, y: 6.2 }, ribbon);
+      holder.style.display = "none";
+      this.#castles.set(g.id, holder);
+      this.#ribbons.set(g.id, { node: ribbon, key: null });
     }
+
+    this.#fx = el("g", { class: "fx" }, svg);
 
     svg.addEventListener("click", (e) => {
       if (e.target === svg) this.#select(null);
@@ -138,13 +208,14 @@ export class BulgariaMap extends EventTarget {
    * Paint the game state.
    * @param {object} s
    * @param {Record<string,string|null>} s.owners  province → player id
-   * @param {Array} s.players                    [{id,color,castleProvinceId,towers,maxTowers,isEliminated}]
+   * @param {Array} s.players                    [{id,name,color,castleProvinceId,towers,maxTowers,isEliminated}]
    * @param {string[]} s.targets                 provinces the local player may click now
    * @param {string|null} s.targetKind           "castle" | "claim" | "attack"
-   * @param {string|null} s.battleProvince       province under attack
+   * @param {object|null} s.battle               {attackerId, defenderId, provinceId} – the attack in progress
+   * @param {string|null} s.turnPlayer           player whose turn it is (their land glows)
    * @param {Record<string,number>} s.points     province → point value (empty hides the numbers)
    */
-  setState({ owners = {}, players = [], targets = [], targetKind = null, battleProvince = null, points = {} }) {
+  setState({ owners = {}, players = [], targets = [], targetKind = null, battle = null, turnPlayer = null, points = {} }) {
     for (const [id, text] of this.#points) {
       const value = points[id];
       text.textContent = value ? `${value} т.` : "";
@@ -153,6 +224,7 @@ export class BulgariaMap extends EventTarget {
 
     const byId = new Map(players.map((p) => [p.id, p]));
     const targetSet = new Set(targets);
+    const battleProvince = battle?.provinceId ?? null;
 
     for (const [id, path] of this.#paths) {
       const owner = byId.get(owners[id]);
@@ -160,8 +232,19 @@ export class BulgariaMap extends EventTarget {
       path.classList.toggle("is-owned", !!owner);
       path.classList.toggle("is-target", targetSet.has(id));
       path.classList.toggle("is-battle", id === battleProvince);
+      path.classList.toggle("is-turn", !!owner && owner.id === turnPlayer);
       this.#labels.get(id).classList.toggle("on-owned", !!owner);
+
+      // A province that changed hands flashes once.
+      const before = this.#owners?.[id];
+      if (before && owners[id] && before !== owners[id]) {
+        path.classList.remove("is-captured");
+        void path.getBBox(); // restart the animation
+        path.classList.add("is-captured");
+        setTimeout(() => path.classList.remove("is-captured"), 1600);
+      }
     }
+    this.#owners = owners && Object.keys(owners).length ? { ...owners } : null;
 
     // Animated outlines for clickable targets and the province under attack.
     this.#overlay.replaceChildren();
@@ -172,14 +255,134 @@ export class BulgariaMap extends EventTarget {
       el("path", { d: this.#paths.get(battleProvince).getAttribute("d"), class: "outline outline-battle" }, this.#overlay);
     }
 
-    for (const [id, castle] of this.#castles) {
+    for (const [id, holder] of this.#castles) {
       const owner = players.find((p) => p.castleProvinceId === id);
-      castle.style.display = owner ? "" : "none";
+      holder.style.display = owner ? "" : "none";
       if (!owner) continue;
+      const castle = holder.firstChild;
       castle.classList.toggle("is-fallen", owner.isEliminated);
+      castle.classList.toggle("is-turn", owner.id === turnPlayer);
       const standing = owner.isEliminated ? 0 : owner.towers;
-      castle.querySelectorAll(".tower").forEach((tower, i) => tower.classList.toggle("is-lost", i >= standing));
-      castle.style.setProperty("--castle-color", owner.color);
+      castle.towers.forEach((tower, i) => tower.classList.toggle("is-lost", i >= standing));
+      holder.style.setProperty("--castle-color", owner.color);
+      this.#paintRibbon(id, owner);
     }
+
+    this.#showAttack(battle, owners, byId);
+  }
+
+  /** The owner's name under their capital, shortened to fit. Hidden on the ruins of a fallen castle. */
+  #paintRibbon(id, owner) {
+    const ribbon = this.#ribbons.get(id);
+    ribbon.node.style.display = owner.isEliminated ? "none" : "";
+    const key = `${owner.name}|${owner.isEliminated}`;
+    if (ribbon.key === key || owner.isEliminated) return;
+
+    const text = ribbon.node.querySelector("text");
+    let label = shorten(owner.name, 14);
+    text.textContent = label;
+    let width = text.getComputedTextLength();
+    while (width > RIBBON_MAX - 6 && label.length > 4) {
+      label = shorten(owner.name, label.length - 1);
+      text.textContent = label;
+      width = text.getComputedTextLength();
+    }
+    // Not laid out yet (map hidden): estimate now, measure properly on a later call.
+    if (!width) width = Math.min(RIBBON_MAX - 6, label.length * 3.6);
+    else ribbon.key = key;
+
+    const rect = ribbon.node.querySelector("rect");
+    rect.setAttribute("x", -(width / 2 + 3));
+    rect.setAttribute("width", width + 6);
+    ribbon.node.querySelector("title")?.remove();
+    el("title", {}, ribbon.node).textContent = owner.name;
+  }
+
+  /**
+   * Sword flying from the attacker's land to the province under attack, a trail in the attacker's
+   * colour and an impact ring. It stays over the province until the battle is decided.
+   */
+  #showAttack(battle, owners, players) {
+    const key = battle ? `${battle.attackerId}|${battle.provinceId}` : null;
+    if (this.#attack?.key === key) return;
+
+    if (this.#attack) {
+      cancelAnimationFrame(this.#attack.frame);
+      const old = this.#attack.node;
+      old.classList.add("is-leaving");
+      setTimeout(() => old.remove(), 400);
+      this.#attack = null;
+    }
+    if (!battle) return;
+
+    const to = this.#centers.get(battle.provinceId);
+    const from = this.#attackSource(battle, owners);
+    if (!to || !from) return;
+    const color = players.get(battle.attackerId)?.color ?? "#e7a95f";
+
+    // A gentle arc: control point to the side of the straight line.
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const bend = Math.min(40, len * 0.3);
+    const ctrl = { x: (from.x + to.x) / 2 - (dy / len) * bend, y: (from.y + to.y) / 2 + (dx / len) * bend };
+
+    const node = el("g", { class: "attack", style: `--attack-color:${color}` }, this.#fx);
+    el("path", { d: `M${from.x} ${from.y} Q${ctrl.x} ${ctrl.y} ${to.x} ${to.y}`, class: "attack-trail" }, node);
+    el("circle", { cx: from.x, cy: from.y, r: 3.2, class: "attack-origin" }, node);
+    el("circle", { cx: to.x, cy: to.y, r: 6, class: "attack-impact" }, node);
+    el("circle", { cx: to.x, cy: to.y, r: 6, class: "attack-impact late" }, node);
+
+    // The sword points "up" (−y) in its own coordinates, with the tip at the origin.
+    const sword = el("g", { class: "sword" }, node);
+    const blade = el("g", { class: "sword-body" }, sword);
+    el("path", { d: "M0 0 L3 5.5 L3 27 L-3 27 L-3 5.5 Z", class: "blade" }, blade);
+    el("path", { d: "M0 5 V25", class: "fuller" }, blade);
+    el("rect", { x: -9, y: 27, width: 18, height: 3.4, rx: 1.7, class: "guard" }, blade);
+    el("rect", { x: -1.8, y: 30.4, width: 3.6, height: 8.5, rx: 1, class: "grip" }, blade);
+    el("circle", { cx: 0, cy: 41.3, r: 2.9, class: "guard" }, blade);
+
+    const at = (t) => {
+      const u = 1 - t;
+      const x = u * u * from.x + 2 * u * t * ctrl.x + t * t * to.x;
+      const y = u * u * from.y + 2 * u * t * ctrl.y + t * t * to.y;
+      const tx = 2 * u * (ctrl.x - from.x) + 2 * t * (to.x - ctrl.x);
+      const ty = 2 * u * (ctrl.y - from.y) + 2 * t * (to.y - ctrl.y);
+      const angle = (Math.atan2(tx, -ty) * 180) / Math.PI;
+      sword.setAttribute("transform", `translate(${x} ${y}) rotate(${angle}) scale(1.05)`);
+    };
+
+    const attack = { key, node, frame: 0 };
+    this.#attack = attack;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      at(1);
+      node.classList.add("is-struck");
+      return;
+    }
+
+    const start = performance.now();
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / SWORD_FLIGHT_MS);
+      at(easeInOut(t));
+      if (t < 1) attack.frame = requestAnimationFrame(step);
+      else node.classList.add("is-struck");
+    };
+    at(0);
+    attack.frame = requestAnimationFrame(step);
+  }
+
+  /** Where the attack comes from: the attacker's neighbouring province closest to the target. */
+  #attackSource(battle, owners) {
+    const to = this.#centers.get(battle.provinceId);
+    const neighbours = this.#provinces.get(battle.provinceId)?.neighbors ?? [];
+    let candidates = neighbours.filter((id) => owners[id] === battle.attackerId);
+    if (!candidates.length) candidates = Object.keys(owners).filter((id) => owners[id] === battle.attackerId);
+    let best = null;
+    for (const id of candidates) {
+      const c = this.#centers.get(id);
+      if (c && (!best || Math.hypot(c.x - to.x, c.y - to.y) < Math.hypot(best.x - to.x, best.y - to.y))) best = c;
+    }
+    return best;
   }
 }

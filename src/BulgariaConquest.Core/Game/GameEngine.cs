@@ -177,7 +177,46 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
         game.Round = 1;
         game.TurnIndex = -1;
         Log(game, "Всички земи са заети. Започват битките!");
+        ShuffleTurnOrder(game);
         AdvanceTurn(game);
+    }
+
+    /// <summary>
+    /// Draws a random attack order for the current conquest round. Every active player still attacks once
+    /// per round; nobody attacks twice in a row across the round boundary, and the order differs from the
+    /// previous round whenever that is possible.
+    /// </summary>
+    private void ShuffleTurnOrder(GameState game)
+    {
+        var active = game.TurnOrder.Where(id => !game.GetPlayer(id).IsEliminated).ToList();
+        if (active.Count < 2) return; // the game is over anyway
+        var lastToAct = game.RoundOrders.Count > 0 ? active.LastOrDefault() : null;
+
+        var allowed = Permutations(active).Where(o => o.Count < 2 || o[0] != lastToAct).ToList();
+        var fresh = allowed.Where(o => !o.SequenceEqual(active)).ToList();
+        var pool = fresh.Count > 0 ? fresh : allowed.Count > 0 ? allowed : [active];
+
+        game.TurnOrder = pool[_random.Next(pool.Count)]
+            .Concat(game.TurnOrder.Where(id => game.GetPlayer(id).IsEliminated))
+            .ToList();
+        game.RoundOrders.Add(game.TurnOrder.ToList());
+        var names = game.TurnOrder.Take(active.Count).Select(id => game.GetPlayer(id).Name);
+        Log(game, $"Ред на атаките в рунд {game.Round}: {string.Join(", ", names)}.");
+    }
+
+    private static IEnumerable<List<string>> Permutations(List<string> items)
+    {
+        if (items.Count <= 1)
+        {
+            yield return items.ToList();
+            yield break;
+        }
+        for (var i = 0; i < items.Count; i++)
+        {
+            var rest = items.Where((_, j) => j != i).ToList();
+            foreach (var tail in Permutations(rest))
+                yield return [items[i], .. tail];
+        }
     }
 
     private void AdvanceTurn(GameState game)
@@ -194,6 +233,7 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
                 game.Round++;
                 if (game.Round > game.Settings.ConquestRounds) break;
                 Log(game, $"Рунд {game.Round} от {game.Settings.ConquestRounds}.");
+                ShuffleTurnOrder(game);
             }
 
             var player = game.GetPlayer(game.TurnOrder[game.TurnIndex]);
@@ -225,7 +265,9 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
         else if (!battle.IsCastle)
         {
             game.Owners[battle.ProvinceId] = attacker.Id;
-            Log(game, $"{attacker.Name} превзе {province}.");
+            // The value belongs to the province, not to the capture: retaking it later never counts twice.
+            game.ConqueredProvinces.Add(battle.ProvinceId);
+            Log(game, $"{attacker.Name} превзе {province} (+{game.Settings.ConqueredTerritoryPoints} т.).");
         }
         else
         {
@@ -270,13 +312,14 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
     /// <summary>
     /// What a province is worth to whoever holds it: a standing castle is worth <see cref="GameSettings.CastlePoints"/>,
     /// the ruins of a fallen castle ("old capital") <see cref="GameSettings.RuinedCastlePoints"/>,
+    /// a province taken in battle <see cref="GameSettings.ConqueredTerritoryPoints"/>,
     /// every other province <see cref="GameSettings.TerritoryPoints"/>.
     /// </summary>
     public int ProvincePoints(GameState game, string provinceId)
     {
         var builder = game.Players.FirstOrDefault(p => p.CastleProvinceId == provinceId);
-        if (builder is null) return game.Settings.TerritoryPoints;
-        return builder.IsEliminated ? game.Settings.RuinedCastlePoints : game.Settings.CastlePoints;
+        if (builder is not null) return builder.IsEliminated ? game.Settings.RuinedCastlePoints : game.Settings.CastlePoints;
+        return game.ConqueredProvinces.Contains(provinceId) ? game.Settings.ConqueredTerritoryPoints : game.Settings.TerritoryPoints;
     }
 
     /// <summary>Point value of every province, for display on the map.</summary>
@@ -288,7 +331,9 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
     private void StartQuestion(GameState game, QuestionPurpose purpose, List<string> participants)
     {
         game.ActionDeadline = null;
-        var round = new QuestionRound { Purpose = purpose, Participants = participants, StartedAt = Now };
+        // Clients announce the question during the intro and show it at StartedAt; the timer runs from there.
+        var start = Now.AddSeconds(Math.Max(0, game.Settings.QuestionIntroSeconds));
+        var round = new QuestionRound { Purpose = purpose, Participants = participants, StartedAt = start };
 
         // A battle (and its tiebreak) asks from the theme the attacker picked with the "Тема" lifeline.
         var theme = purpose == QuestionPurpose.Distribution ? null : game.Battle?.Category;
@@ -308,7 +353,7 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
         round.CorrectIndex = q.CorrectIndex;
         round.CorrectNumber = null;
         round.Unit = null;
-        round.Deadline = Now.AddSeconds(game.Settings.ChoiceAnswerSeconds);
+        round.Deadline = round.StartedAt.AddSeconds(game.Settings.ChoiceAnswerSeconds);
     }
 
     private void Fill(GameState game, QuestionRound round, NumericQuestion q)
@@ -322,7 +367,7 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
         round.CorrectIndex = null;
         round.CorrectNumber = q.Answer;
         round.Unit = q.Unit;
-        round.Deadline = Now.AddSeconds(game.Settings.NumericAnswerSeconds);
+        round.Deadline = round.StartedAt.AddSeconds(game.Settings.NumericAnswerSeconds);
     }
 
     public void AnswerNumeric(GameState game, string playerId, double value)
@@ -364,6 +409,7 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
         {
             q.CorrectPlayers = q.Participants.Where(id => q.Answers.TryGetValue(id, out var a) && a.Choice == q.CorrectIndex).ToList();
         }
+        q.RevealedAt = Now;
         q.RevealUntil = Now.AddSeconds(game.Settings.RevealSeconds);
     }
 

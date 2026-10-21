@@ -52,6 +52,12 @@ public sealed class GameState
     public int TurnIndex { get; set; }
     public int Round { get; set; }
 
+    /// <summary>Attack order of every conquest round so far (index 0 = round 1). Reshuffled each round.</summary>
+    public List<List<string>> RoundOrders { get; set; } = [];
+
+    /// <summary>Provinces taken in battle; each is worth <see cref="GameSettings.ConqueredTerritoryPoints"/> to its holder.</summary>
+    public HashSet<string> ConqueredProvinces { get; set; } = [];
+
     /// <summary>Deadline for the action the game is currently waiting for (castle, claim, attack).</summary>
     public DateTimeOffset? ActionDeadline { get; set; }
 
@@ -151,11 +157,14 @@ public sealed class QuestionRound
 
     public List<string> Participants { get; set; } = [];
     public Dictionary<string, SubmittedAnswer> Answers { get; set; } = [];
+
+    /// <summary>When the question is shown and the answer timer starts (after the intro pause).</summary>
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset Deadline { get; set; }
 
     /// <summary>Set once the question is resolved; the result stays on screen until then.</summary>
     public DateTimeOffset? RevealUntil { get; set; }
+    public DateTimeOffset? RevealedAt { get; set; }
 
     /// <summary>Numeric: participants best-first. Choice: participants who answered correctly.</summary>
     public List<string> Ranking { get; set; } = [];

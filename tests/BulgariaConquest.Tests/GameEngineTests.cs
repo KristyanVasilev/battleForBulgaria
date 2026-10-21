@@ -67,7 +67,64 @@ public class GameEngineTests
 
         Assert.Equal(GamePhase.Conquest, _game.Phase);
         Assert.Equal(1, _game.Round);
-        Assert.Equal("p1", _engine.CurrentPlayerId(_game));
+        Assert.Equal(_game.TurnOrder[0], _engine.CurrentPlayerId(_game));
+    }
+
+    [Fact]
+    public void Attack_order_is_shuffled_every_round_and_nobody_attacks_twice_in_a_row()
+    {
+        _game.Settings = _game.Settings with { ConquestRounds = 30 };
+        StartConquest();
+
+        var attackers = new List<string>();
+        while (_game.Phase == GamePhase.Conquest)
+        {
+            attackers.Add(_engine.CurrentPlayerId(_game)!);
+            SkipTurn();
+        }
+
+        Assert.Equal(30, _game.RoundOrders.Count);
+        foreach (var order in _game.RoundOrders)
+            Assert.Equal(["p1", "p2", "p3"], order.Order()); // everyone attacks once per round
+        for (var i = 1; i < _game.RoundOrders.Count; i++)
+        {
+            Assert.False(_game.RoundOrders[i].SequenceEqual(_game.RoundOrders[i - 1]));
+            Assert.NotEqual(_game.RoundOrders[i - 1][^1], _game.RoundOrders[i][0]);
+        }
+        Assert.True(_game.RoundOrders.Select(o => o[0]).Distinct().Count() > 1); // not always the same player first
+        Assert.DoesNotContain(attackers.Zip(attackers.Skip(1)), pair => pair.First == pair.Second);
+    }
+
+    [Fact]
+    public void A_province_taken_in_battle_is_worth_400_and_never_counts_twice()
+    {
+        StartConquest();
+        var p1Before = _engine.Score(_game, "p1");
+        var p2Before = _engine.Score(_game, "p2");
+
+        WinBattle("p1", "p2", "b");
+        Assert.Equal(400, _engine.ProvincePoints(_game, "b"));
+        Assert.Equal(p1Before + 400, _engine.Score(_game, "p1"));
+        Assert.Equal(p2Before - 200, _engine.Score(_game, "p2"));
+
+        // p2 takes it back: p2 now holds it for 400, p1 loses those 400 – nothing is added twice.
+        WinBattle("p2", "p1", "b");
+        Assert.Equal(p1Before, _engine.Score(_game, "p1"));
+        Assert.Equal(p2Before + 200, _engine.Score(_game, "p2"));
+
+        WinBattle("p1", "p2", "b");
+        Assert.Equal(400, _engine.ProvincePoints(_game, "b"));
+        Assert.Equal(p1Before + 400, _engine.Score(_game, "p1"));
+        Assert.Single(_game.ConqueredProvinces);
+
+        // A failed attack changes nothing.
+        while (_engine.CurrentPlayerId(_game) != "p2") SkipTurn();
+        _engine.Attack(_game, "p2", "b");
+        _engine.AnswerChoice(_game, "p2", FixedQuestions.Wrong);
+        _engine.AnswerChoice(_game, "p1", FixedQuestions.Correct);
+        FinishReveal();
+        Assert.Equal("p1", _game.Owners["b"]);
+        Assert.Equal(p1Before + 400, _engine.Score(_game, "p1"));
     }
 
     [Fact]
@@ -76,13 +133,14 @@ public class GameEngineTests
         StartConquest();
 
         // p1 owns a, f; p2 owns b, c (castle), d; p3 owns e (castle).
+        while (_engine.CurrentPlayerId(_game) != "p1") SkipTurn();
         _engine.Attack(_game, "p1", "b");
         _engine.AnswerChoice(_game, "p1", FixedQuestions.Correct);
         _engine.AnswerChoice(_game, "p2", FixedQuestions.Wrong);
         FinishReveal();
 
         Assert.Equal("p1", _game.Owners["b"]);
-        Assert.Equal("p2", _engine.CurrentPlayerId(_game));
+        Assert.NotEqual("p1", _engine.CurrentPlayerId(_game));
     }
 
     [Fact]
@@ -90,6 +148,7 @@ public class GameEngineTests
     {
         StartConquest();
 
+        while (_engine.CurrentPlayerId(_game) != "p1") SkipTurn();
         _engine.Attack(_game, "p1", "b");
         _engine.AnswerChoice(_game, "p1", FixedQuestions.Correct);
         _engine.AnswerChoice(_game, "p2", FixedQuestions.Correct);
@@ -199,6 +258,16 @@ public class GameEngineTests
         _engine.ClaimProvince(_game, "p2", "b");
         _engine.ClaimProvince(_game, "p2", "d");
         _engine.ClaimProvince(_game, "p1", "f");
+    }
+
+    private void WinBattle(string attacker, string defender, string province)
+    {
+        while (_engine.CurrentPlayerId(_game) != attacker) SkipTurn();
+        _engine.Attack(_game, attacker, province);
+        _engine.AnswerChoice(_game, attacker, FixedQuestions.Correct);
+        _engine.AnswerChoice(_game, defender, FixedQuestions.Wrong);
+        FinishReveal();
+        Assert.Equal(attacker, _game.Owners[province]);
     }
 
     private void FinishReveal()

@@ -5,12 +5,14 @@
   "choiceAnswerSeconds": 15,
   "numericAnswerSeconds": 20,
   "turnSeconds": 30,
-  "revealSeconds": 4,
+  "revealSeconds": 6,
+  "questionIntroSeconds": 2.5,
   "conquestRounds": 6,
   "territoryPoints": 200,
+  "conqueredTerritoryPoints": 400,
   "castlePoints": 1000,
   "ruinedCastlePoints": 1000,
   "distributionPicks": [2, 1, 0],
   "requireAdjacentClaims": true,
-  "playerColors": ["#e7a95f", "#b5524a", "#7d6ba6"]
+  "playerColors": ["#e7a95f", "#b5524a", "#7d6ba6", "#4f9a8a", "#4f7fb8"]
 }

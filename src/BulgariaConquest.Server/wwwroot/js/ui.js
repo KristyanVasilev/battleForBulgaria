@@ -53,78 +53,250 @@ function towers(p) {
   );
 }
 
+let clockOffset = 0;
+
+/** Server minus local clock, so intros and timers line up with the server. */
+export function setClockOffset(ms) {
+  clockOffset = ms;
+}
+
+/** True while a question is announced but not shown yet (the pause before its timer starts). */
+export function inIntro(q) {
+  return !!q && !q.revealed && secondsLeft(q.startedAt, clockOffset) > 0;
+}
+
+/** The player the game is waiting for – during a battle, the attacker. */
+export function activePlayerId(game) {
+  return game?.currentPlayerId ?? game?.battle?.attackerId ?? null;
+}
+
+const TURN_HINTS = {
+  castleSelection: "Избери област за замъка си",
+  distribution: "Заеми свободна област до своите",
+  conquest: "Нападни съседна вражеска област",
+};
+
+/**
+ * Top bar pill: whose turn it is, in that player's colour, with a pulsing crest.
+ * It pops whenever the turn passes to someone else.
+ */
 export function renderStatus(game, me) {
   const status = $("#status");
   if (!game) {
+    status.dataset.key = "";
+    status.className = "status-pill";
     status.replaceChildren(h("strong", {}, "Създай игра или влез с код, за да започнеш."));
     return;
   }
 
   const current = game.currentPlayerId;
   const yourTurn = current && current === me;
+  const active = activePlayerId(game);
+  const player = game.players.find((p) => p.id === active);
+  const q = game.question;
+  const battle = game.battle;
   let text;
   if (game.phase === "lobby") text = `Чакаме играчи (${game.players.length}/3)…`;
   else if (game.phase === "finished") text = game.winnerId ? `Победител: ${playerName(game, game.winnerId)}!` : "Играта приключи.";
-  else if (game.question) text = game.question.revealed ? "Резултат от въпроса" : "Въпрос! Отговорете бързо.";
+  else if (q && battle && q.purpose !== "distribution") {
+    text = `⚔ ${playerName(game, battle.attackerId)} срещу ${playerName(game, battle.defenderId)}${q.revealed ? " – резултат" : ""}`;
+  } else if (q) text = inIntro(q) ? "Подгответе се – идва въпрос…" : q.revealed ? "Резултат от въпроса" : "Въпрос за всички! Отговорете бързо.";
   else if (yourTurn) {
     text = {
-      castleSelection: "Твой ред: избери област за замъка си.",
-      distribution: `Твой ред: заеми ${game.picks[0]?.remaining ?? 1} свободна(и) област(и).`,
-      conquest: "Твой ред: нападни съседна вражеска област.",
+      castleSelection: "Твой ход: избери област за замъка си.",
+      distribution: `Твой ход: заеми ${game.picks[0]?.remaining ?? 1} свободна(и) област(и).`,
+      conquest: "Твой ход: нападни съседна вражеска област.",
     }[game.phase];
   } else if (current) text = `Ход на ${playerName(game, current)}…`;
   else text = "";
 
+  const running = game.phase !== "lobby" && game.phase !== "finished";
+  const deadline = game.actionDeadline && !q ? game.actionDeadline : null;
+  const key = `${text}|${active}|${deadline}|${running}`;
+  if (status.dataset.key === key) return;
+
+  const turnKey = `${game.id}|${game.phase}|${active}`;
+  const passed = status.dataset.turn !== turnKey;
+  status.dataset.turn = turnKey;
+  status.dataset.key = key;
+  status.className = ["status-pill", running && player && "has-turn", running && active === me && "is-mine"].filter(Boolean).join(" ");
+  status.style.setProperty("--player-color", player?.color ?? "var(--amber)");
+  if (passed && running && player) {
+    void status.offsetWidth; // restart the pop animation
+    status.classList.add("is-passing");
+  }
+
   status.replaceChildren(
     ...[
+      running && player ? h("span", { class: "turn-crest", "aria-hidden": "true" }, "♜") : null,
       h("strong", { class: yourTurn ? "your-turn" : "" }, text),
-      game.actionDeadline && !game.question ? h("span", { class: "timer", "data-deadline": game.actionDeadline }, "") : null,
+      deadline ? h("span", { class: "timer", "data-deadline": deadline }, "") : null,
     ].filter(Boolean)
   );
 }
 
+const announce = { key: null, turnKey: null, timer: 0 };
+
 /**
- * Bottom-right panel: the phase name and one lamp per conquest round, the current one lit.
- * Under each lamp a tick per player in turn order, so you can see whose attack is next.
+ * Big banner in the middle of the map. During a question's intro it says what is coming
+ * ("X напада Пловдив"); when the turn passes to another player it flashes "Ход на …" for a moment.
+ */
+export function renderAnnouncer(game, me, provinceName) {
+  const box = $("#announce");
+  const q = game?.question;
+  let next = null;
+
+  if (game && inIntro(q)) {
+    const battle = game.battle;
+    if (q.purpose === "battle" && battle) {
+      next = {
+        key: `q|${q.startedAt}`,
+        color: game.players.find((p) => p.id === battle.attackerId)?.color,
+        icon: "⚔",
+        title: `${playerName(game, battle.attackerId)} напада ${provinceName(battle.provinceId)}`,
+        sub: battle.isCastle ? `Обсада на замъка на ${playerName(game, battle.defenderId)}!` : `Защитава ${playerName(game, battle.defenderId)}`,
+      };
+    } else if (q.purpose === "battleTiebreak") {
+      next = { key: `q|${q.startedAt}`, icon: "⚖", title: "Равенство!", sub: "И двамата са прави – решава числов въпрос" };
+    } else {
+      next = { key: `q|${q.startedAt}`, icon: "📜", title: "Въпрос за земите", sub: "Най-точният отговор избира пръв" };
+    }
+  } else if (game && !q && game.currentPlayerId && game.phase !== "finished" && game.phase !== "lobby") {
+    const turnKey = `${game.id}|${game.phase}|${game.currentPlayerId}`;
+    if (turnKey !== announce.turnKey) {
+      announce.turnKey = turnKey;
+      const mine = game.currentPlayerId === me;
+      next = {
+        key: `t|${turnKey}`,
+        flash: true,
+        color: game.players.find((p) => p.id === game.currentPlayerId)?.color,
+        icon: mine ? "♛" : "♜",
+        title: mine ? "Твой ход!" : `Ход на ${playerName(game, game.currentPlayerId)}`,
+        sub: mine ? TURN_HINTS[game.phase] : game.phase === "conquest" ? `Рунд ${game.round} от ${game.maxRounds}` : "",
+        mine,
+      };
+    }
+  }
+
+  if (!game) announce.turnKey = null;
+  if (next && next.key === announce.key) return;
+  if (!next) {
+    // Intros stay up until the question appears; flashes hide themselves.
+    if (announce.key?.startsWith("q|") || (!game && announce.key)) hideAnnouncer(box);
+    return;
+  }
+
+  announce.key = next.key;
+  clearTimeout(announce.timer);
+  box.style.setProperty("--player-color", next.color ?? "var(--amber)");
+  box.className = ["announce", next.flash ? "is-flash" : "is-intro", next.mine && "is-mine"].filter(Boolean).join(" ");
+  box.replaceChildren(
+    h(
+      "div",
+      { class: "announce-card" },
+      h("span", { class: "announce-icon", "aria-hidden": "true" }, next.icon),
+      h("div", { class: "announce-text" }, h("strong", { class: "announce-title" }, next.title), next.sub ? h("span", { class: "announce-sub" }, next.sub) : null)
+    )
+  );
+  box.hidden = false;
+  if (next.flash) announce.timer = setTimeout(() => hideAnnouncer($("#announce")), 1900);
+}
+
+function hideAnnouncer(box) {
+  announce.key = null;
+  clearTimeout(announce.timer);
+  box.classList.add("is-leaving");
+  announce.timer = setTimeout(() => (box.hidden = true), 300);
+}
+
+/**
+ * Bottom-right panel: the phase, one lamp per conquest round (the current one lit) with a tick per
+ * player in that round's attack order, and below it the order of the current step as a list.
  */
 export function renderRounds(game) {
   const title = $("#phase-title");
   const rounds = $("#rounds");
+  const list = $("#turn-order");
   if (!game) {
     rounds.dataset.key = "";
+    list.replaceChildren();
     return rounds.replaceChildren();
   }
-  title.textContent = PHASES[game.phase] ?? game.phase;
 
   const finished = game.phase === "finished";
   const current = game.phase === "conquest" ? Math.min(game.round, game.maxRounds) : finished ? game.maxRounds + 1 : 0;
-  const turn = game.players.findIndex((p) => p.id === game.currentPlayerId);
-  const key = `${game.id}|${current}|${turn}|${game.players.map((p) => +p.isEliminated).join("")}`;
+  const active = activePlayerId(game);
+  const orders = game.roundOrders ?? [];
+  const picks = game.picks.map((p) => p.playerId + p.remaining).join();
+  const key = `${game.id}|${game.phase}|${current}|${active}|${orders.length}|${picks}|${game.players.map((p) => +p.isEliminated).join("")}`;
   if (rounds.dataset.key === key) return;
   rounds.dataset.key = key;
 
+  title.replaceChildren(
+    ...[
+      h("span", {}, PHASES[game.phase] ?? game.phase),
+      current >= 1 && current <= game.maxRounds ? h("span", { class: "round-count" }, `Рунд ${current}/${game.maxRounds}`) : null,
+    ].filter(Boolean)
+  );
+
+  const players = new Map(game.players.map((p) => [p.id, p]));
   rounds.replaceChildren(
     ...Array.from({ length: game.maxRounds }, (_, i) => {
       const n = i + 1;
       const state = n < current ? "is-past" : n === current ? "is-current" : "";
+      const order = orders[i];
+      const turn = n === current && order ? order.indexOf(active) : -1;
       return h(
         "div",
-        { class: `round ${state}`, title: `Рунд ${n} от ${game.maxRounds}` },
+        { class: `round ${state}`, title: order ? `Рунд ${n}: ${order.map((id) => players.get(id)?.name).join(" → ")}` : `Рунд ${n} от ${game.maxRounds}` },
+        h("span", { class: "round-no" }, n),
         h("span", { class: "round-lamp" }),
         h(
           "span",
           { class: "round-turns" },
-          game.players.map((p, j) =>
-            h("i", {
-              style: `--player-color:${p.color}`,
-              class: [p.isEliminated && "is-out", (n < current || (n === current && j < turn)) && "is-done", n === current && j === turn && "is-now"].filter(Boolean).join(" "),
-            })
-          )
+          order
+            ? order.map((id, j) =>
+                h("i", {
+                  style: `--player-color:${players.get(id)?.color}`,
+                  class: [players.get(id)?.isEliminated && "is-out", (n < current || (n === current && j < turn)) && "is-done", j === turn && "is-now"].filter(Boolean).join(" "),
+                })
+              )
+            : game.players.filter((p) => !p.isEliminated).map(() => h("i", { class: "is-unknown" }))
         )
       );
     })
   );
   rounds.setAttribute("aria-label", current >= 1 && current <= game.maxRounds ? `Рунд ${current} от ${game.maxRounds}` : `${game.maxRounds} рунда битки`);
+
+  // Who plays when in the current step.
+  let caption = null;
+  let rows = [];
+  if (game.phase === "conquest" && orders[current - 1]) {
+    const order = orders[current - 1];
+    const turn = order.indexOf(active);
+    caption = "Ред на атаките в този рунд";
+    rows = order.map((id, j) => ({ id, state: players.get(id)?.isEliminated ? "out" : j < turn ? "done" : j === turn ? "now" : "next" }));
+  } else if (game.phase === "castleSelection") {
+    const turn = game.turnOrder.indexOf(active);
+    caption = "Ред за избор на замък";
+    rows = game.turnOrder.map((id, j) => ({ id, state: j < turn ? "done" : j === turn ? "now" : "next" }));
+  } else if (game.phase === "distribution" && game.picks.length && !game.question) {
+    caption = "Избират земи";
+    rows = game.picks.map((p, j) => ({ id: p.playerId, state: j === 0 ? "now" : "next", extra: `×${p.remaining}` }));
+  }
+  const MARK = { done: "✓", now: "◀", next: "", out: "✕" };
+  list.replaceChildren(
+    ...(caption ? [h("li", { class: "turn-caption" }, caption)] : []),
+    ...rows.map((r, j) =>
+      h(
+        "li",
+        { class: `turn-row is-${r.state}`, style: `--player-color:${players.get(r.id)?.color}` },
+        h("span", { class: "turn-no" }, j + 1),
+        h("span", { class: "turn-name" }, players.get(r.id)?.name ?? "?"),
+        h("span", { class: "turn-mark" }, r.extra ?? MARK[r.state])
+      )
+    )
+  );
 }
 
 // Podium steps are kept between renders (keyed by player id) so a running "+200" animation is not restarted.
@@ -174,7 +346,7 @@ export function renderScoreboard(game, me) {
     const { el } = plate;
     const place = p.isEliminated ? null : places[i];
     const flash = plate.flashUntil > Date.now() ? plate.flash : null;
-    el.className = ["plate", `place-${place ?? "out"}`, p.id === game.currentPlayerId && "is-current", p.id === me && "is-me", p.isEliminated && "is-out", p.id === game.winnerId && "is-winner", flash]
+    el.className = ["plate", `place-${place ?? "out"}`, p.id === activePlayerId(game) && "is-current", p.id === me && "is-me", p.isEliminated && "is-out", p.id === game.winnerId && "is-winner", flash]
       .filter(Boolean)
       .join(" ");
     el.style.gridColumn = PODIUM_COLUMNS[i];
@@ -272,7 +444,7 @@ export function renderJokers(container, game, me, use, { compact = false } = {})
   if (!container) return;
   const player = game?.players.find((p) => p.id === me);
   const q = game?.question;
-  const canAsk = !!q && !q.revealed && q.participants.includes(me) && !q.answered.includes(me);
+  const canAsk = !!q && !q.revealed && !inIntro(q) && q.participants.includes(me) && !q.answered.includes(me);
 
   container.replaceChildren(
     ...JOKERS.map((j) => {
@@ -396,17 +568,31 @@ export function renderProvinceTip(game, map, id) {
   tip.hidden = false;
 }
 
+let questionLeaving = 0; // timer of the fade-out after a question ends
+
 /**
  * Question overlay. `answer(kind, value)` is called when the local player answers.
+ * Hidden during the intro pause; fades out when the question is over. After the reveal every
+ * player's pick is shown in that player's colour.
  */
-export function renderQuestion(game, me, answer) {
+export function renderQuestion(game, me, answer, provinceName) {
   const box = $("#question");
   const q = game?.question;
-  if (!q) {
-    box.hidden = true;
+  if (!q || inIntro(q)) {
     box.dataset.key = "";
+    if (box.hidden || questionLeaving) return;
+    box.classList.add("is-leaving");
+    questionLeaving = setTimeout(() => {
+      questionLeaving = 0;
+      box.hidden = true;
+      box.classList.remove("is-leaving");
+      box.replaceChildren();
+    }, 320);
     return;
   }
+  clearTimeout(questionLeaving);
+  questionLeaving = 0;
+  box.classList.remove("is-leaving");
   box.hidden = false;
 
   // Rebuild only when the question or its reveal state changes, so a half-typed answer survives
@@ -415,15 +601,18 @@ export function renderQuestion(game, me, answer) {
   if (box.dataset.key === key) {
     const footer = box.querySelector(".q-footer");
     if (footer) footer.textContent = questionFooter(game, q, me);
+    box.querySelector(".q-who")?.replaceWith(whoAnswered(game, q));
     return;
   }
   box.dataset.key = key;
 
   const isParticipant = q.participants.includes(me);
   const hasAnswered = q.answered.includes(me);
+  const color = (pid) => game.players.find((p) => p.id === pid)?.color ?? "#999";
+  const battle = game.battle;
   const title = {
     distribution: "Разпределение на земите",
-    battle: game.battle ? `Битка: ${playerName(game, game.battle.attackerId)} срещу ${playerName(game, game.battle.defenderId)}` : "Битка",
+    battle: battle ? `Битка за ${provinceName(battle.provinceId)}: ${playerName(game, battle.attackerId)} срещу ${playerName(game, battle.defenderId)}` : "Битка",
     battleTiebreak: "Равенство! Решава числов въпрос",
   }[q.purpose];
 
@@ -435,12 +624,15 @@ export function renderQuestion(game, me, answer) {
         { class: "options" },
         q.options.map((opt, i) => {
           const pickedBy = q.revealed ? q.participants.filter((pid) => q.answers?.[pid]?.choice === i) : [];
+          // One colour band per player who picked this answer.
+          const bands = pickedBy.map((pid, j) => `${color(pid)} ${(j * 100) / pickedBy.length}% ${((j + 1) * 100) / pickedBy.length}%`).join(", ");
           return h(
             "button",
             {
-              class: ["option", q.revealed && i === q.correctIndex && "is-correct", q.revealed && i !== q.correctIndex && pickedBy.length && "is-wrong"]
+              class: ["option", q.revealed && i === q.correctIndex && "is-correct", q.revealed && i !== q.correctIndex && pickedBy.length && "is-wrong", pickedBy.length && "is-picked"]
                 .filter(Boolean)
                 .join(" "),
+              style: pickedBy.length ? `--pick-color:${color(pickedBy[0])}; --pick-bands:linear-gradient(180deg, ${bands})` : null,
               disabled: !isParticipant || hasAnswered || q.revealed,
               onclick: (e) => {
                 // Lock all options at once so a double click cannot send two answers.
@@ -449,9 +641,15 @@ export function renderQuestion(game, me, answer) {
                 answer("choice", i);
               },
             },
-            h("span", { class: "letter" }, "АБВГ"[i]),
-            h("span", {}, opt),
-            pickedBy.length ? h("span", { class: "picked" }, pickedBy.map((pid) => playerName(game, pid)).join(", ")) : null
+            h("span", { class: "letter" }, q.revealed ? (i === q.correctIndex ? "✓" : pickedBy.length ? "✗" : "АБВГ"[i]) : "АБВГ"[i]),
+            h("span", { class: "option-text" }, opt),
+            pickedBy.length
+              ? h(
+                  "span",
+                  { class: "picked" },
+                  pickedBy.map((pid) => h("span", { class: "pick-chip", style: `--player-color:${color(pid)}` }, `${"АБВГ"[i]} · ${playerName(game, pid)}${pid === me ? " (ти)" : ""}`))
+                )
+              : null
           );
         })
       )
@@ -487,9 +685,9 @@ export function renderQuestion(game, me, answer) {
           const a = q.answers?.[pid];
           return h(
             "li",
-            {},
-            h("strong", { class: "grow" }, playerName(game, pid)),
-            h("span", {}, a ? `${a.number}` : "без отговор"),
+            { class: "is-player", style: `--player-color:${color(pid)}` },
+            h("strong", { class: "grow" }, playerName(game, pid), pid === me ? h("span", { class: "muted small" }, " · ти") : null),
+            h("span", { class: "rank-answer" }, a ? `${a.number}${q.unit ? " " + q.unit : ""}` : "без отговор"),
             a ? h("span", { class: "muted small" }, `${(a.responseMs / 1000).toFixed(1)} с`) : null
           );
         })
@@ -497,10 +695,11 @@ export function renderQuestion(game, me, answer) {
     );
   }
 
+  const revealBar = q.revealed && q.revealUntil && q.revealedAt;
   box.replaceChildren(
     h(
       "div",
-      { class: "question-card" },
+      { class: `question-card${q.revealed ? " is-revealed" : ""}` },
       h(
         "header",
         {},
@@ -511,15 +710,38 @@ export function renderQuestion(game, me, answer) {
       h("h2", {}, q.text),
       h("div", { class: "q-hints" }),
       ...body,
+      q.revealed ? null : whoAnswered(game, q),
       q.revealed || !q.participants.includes(me) ? null : h("div", { class: "q-jokers" }),
-      h("p", { class: "muted small q-footer" }, questionFooter(game, q, me))
+      h("p", { class: "muted small q-footer" }, questionFooter(game, q, me)),
+      revealBar
+        ? h("div", { class: "q-timer is-next", title: "Продължаваме след малко" }, h("div", { class: "bar", "data-deadline": q.revealUntil, "data-start": q.revealedAt }))
+        : null
+    )
+  );
+}
+
+/** A chip per participant: filled in their colour once they have answered (not what they answered). */
+function whoAnswered(game, q) {
+  return h(
+    "div",
+    { class: "q-who" },
+    q.participants.map((pid) =>
+      h(
+        "span",
+        { class: q.answered.includes(pid) ? "who-chip is-done" : "who-chip", style: `--player-color:${game.players.find((p) => p.id === pid)?.color ?? "#999"}` },
+        h("span", { class: "dot" }),
+        playerName(game, pid),
+        q.answered.includes(pid) ? " ✓" : ""
+      )
     )
   );
 }
 
 function questionFooter(game, q, me) {
   if (q.revealed) {
-    return q.kind === "choice" ? `Верни: ${q.correctPlayers.map((pid) => playerName(game, pid)).join(", ") || "никой"}` : "";
+    if (q.kind !== "choice") return "";
+    const silent = q.participants.filter((pid) => !q.answers?.[pid]);
+    return `Верни: ${q.correctPlayers.map((pid) => playerName(game, pid)).join(", ") || "никой"}${silent.length ? ` · Без отговор: ${silent.map((pid) => playerName(game, pid)).join(", ")}` : ""}`;
   }
   if (!q.participants.includes(me)) {
     return `Наблюдаваш. Отговарят: ${q.participants.map((pid) => playerName(game, pid)).join(", ")}`;

@@ -30,7 +30,7 @@ public sealed class BotDirector(GameEngine engine, BotBrain brain, TimeProvider?
         {
             if (game.Phase is GamePhase.Lobby or GamePhase.Finished) break;
 
-            var context = Context(game, bot);
+            var context = Context(game, bot, now);
             if (context is null) continue;
 
             var key = (game.Id, bot.Id, context);
@@ -62,11 +62,12 @@ public sealed class BotDirector(GameEngine engine, BotBrain brain, TimeProvider?
     }
 
     /// <summary>Identifies "the thing the bot must react to", so each decision is planned once.</summary>
-    private string? Context(GameState game, PlayerState bot)
+    private string? Context(GameState game, PlayerState bot, DateTimeOffset now)
     {
         if (game.Question is { } q)
         {
-            return !q.IsResolved && q.Participants.Contains(bot.Id) && !q.Answers.ContainsKey(bot.Id)
+            // Bots start thinking only once the question is shown to the humans (after the intro).
+            return !q.IsResolved && now >= q.StartedAt && q.Participants.Contains(bot.Id) && !q.Answers.ContainsKey(bot.Id)
                 ? $"q{q.StartedAt.UtcTicks}"
                 : null;
         }
