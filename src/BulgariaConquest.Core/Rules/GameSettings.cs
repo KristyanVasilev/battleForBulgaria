@@ -33,6 +33,9 @@ public sealed record GameSettings
     public int ConqueredTerritoryPoints { get; init; } = 400;
     public int CastlePoints { get; init; } = 1000;
 
+    /// <summary>Bonus for the defender who answers right and keeps the province (or castle tower).</summary>
+    public int DefensePoints { get; init; } = 100;
+
     /// <summary>A fallen castle ("old capital") keeps its value for whoever holds the ruins.</summary>
     public int RuinedCastlePoints { get; init; } = 1000;
 

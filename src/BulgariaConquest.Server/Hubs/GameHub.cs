@@ -16,13 +16,23 @@ public interface IGameClient
 /// </summary>
 public sealed class GameHub(GameManager games, GameEngine engine) : Hub<IGameClient>
 {
-    public async Task<JoinResult> CreateGame(string playerName) =>
-        await Subscribe(await games.CreateAsync(playerName));
+    /// <summary>Game with friends. <paramref name="difficulty"/>: "easy" or "hard".</summary>
+    public async Task<JoinResult> CreateGame(string playerName, string? difficulty) =>
+        await Subscribe(await games.CreateAsync(playerName, ParseDifficulty(difficulty)));
 
-    /// <summary>Single-player game against bots. <paramref name="level"/>: "easy", "normal" or "hard".</summary>
-    public async Task<JoinResult> CreateBotGame(string playerName, string level) =>
-        await Subscribe(await games.CreateBotGameAsync(playerName,
-            Enum.TryParse<BotLevel>(level, ignoreCase: true, out var parsed) ? parsed : BotLevel.Normal));
+    /// <summary>Single-player game against bots. <paramref name="difficulty"/>: "easy" or "hard".</summary>
+    public async Task<JoinResult> CreateBotGame(string playerName, string? difficulty) =>
+        await Subscribe(await games.CreateBotGameAsync(playerName, ParseDifficulty(difficulty)));
+
+    /// <summary>Lobby host only: adds a bot to an empty seat.</summary>
+    public Task AddBot(string gameId, string token) => games.AddBotAsync(gameId, token);
+
+    /// <summary>Lobby host only: removes a player or bot.</summary>
+    public Task KickPlayer(string gameId, string token, string playerId) =>
+        games.ActAsync(gameId, token, (g, p) => engine.KickPlayer(g, p, playerId));
+
+    private static GameDifficulty ParseDifficulty(string? value) =>
+        Enum.TryParse<GameDifficulty>(value, ignoreCase: true, out var parsed) ? parsed : GameDifficulty.Easy;
 
     public async Task<JoinResult> JoinGame(string gameId, string playerName) =>
         await Subscribe(await games.JoinAsync(gameId, playerName));

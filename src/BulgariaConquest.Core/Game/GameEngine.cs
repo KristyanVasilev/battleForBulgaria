@@ -22,9 +22,9 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
 
     // ---------------------------------------------------------------- lobby
 
-    public GameState CreateGame(string id, GameSettings settings)
+    public GameState CreateGame(string id, GameSettings settings, GameDifficulty? difficulty = null)
     {
-        var game = new GameState { Id = id, Settings = settings, CreatedAt = Now, UpdatedAt = Now };
+        var game = new GameState { Id = id, Settings = settings, Difficulty = difficulty, CreatedAt = Now, UpdatedAt = Now };
         foreach (var p in map.Provinces) game.Owners[p.Id] = null;
         Log(game, "Играта е създадена.");
         return game;
@@ -38,19 +38,44 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
         Require(game.Players.Count < game.Settings.MaxPlayers, "Играта е пълна.");
         Require(!game.Players.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)), "Това име вече е заето.");
 
+        // Ids are never reused (a kicked player must not come back as someone else); colours go to the first free one.
         var colors = game.Settings.PlayerColors;
+        var number = game.Players.Select(p => int.TryParse(p.Id.AsSpan(1), out var n) ? n : 0).DefaultIfEmpty(0).Max() + 1;
         var player = new PlayerState
         {
-            Id = $"p{game.Players.Count + 1}",
+            Id = $"p{number}",
             Token = Guid.NewGuid().ToString("N"),
             Name = name,
-            Color = colors[game.Players.Count % colors.Length],
+            Color = colors.FirstOrDefault(c => game.Players.All(p => p.Color != c)) ?? colors[game.Players.Count % colors.Length],
             Towers = game.Settings.TowersPerCastle,
             BotLevel = bot,
         };
         game.Players.Add(player);
         Log(game, bot is null ? $"{name} се присъедини." : $"{name} (бот) се присъедини.");
         return player;
+    }
+
+    /// <summary>The lobby host adds a computer player to an empty seat.</summary>
+    public PlayerState AddBot(GameState game, string hostId, string name, BotLevel level)
+    {
+        RequireHost(game, hostId, "Само създателят на играта може да добавя ботове.");
+        return AddPlayer(game, name, level);
+    }
+
+    /// <summary>The lobby host removes a player (or bot) before the game starts.</summary>
+    public void KickPlayer(GameState game, string hostId, string playerId)
+    {
+        RequireHost(game, hostId, "Само създателят на играта може да премахва играчи.");
+        Require(hostId != playerId, "Не можеш да премахнеш себе си.");
+        var player = game.GetPlayer(playerId);
+        game.Players.Remove(player);
+        Log(game, $"{player.Name} беше премахнат от лобито.");
+    }
+
+    private static void RequireHost(GameState game, string playerId, string message)
+    {
+        Require(game.Phase == GamePhase.Lobby, "Играта вече е започнала.");
+        Require(game.Players.FirstOrDefault()?.Id == playerId, message);
     }
 
     public void Start(GameState game, string playerId)
@@ -137,22 +162,28 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
 
     // ---------------------------------------------------------------- conquest
 
-    /// <summary>Enemy provinces bordering the player's land.</summary>
+    /// <summary>Enemy provinces bordering the player's land – in the last round, any enemy province.</summary>
     public IReadOnlyList<string> AttackTargets(GameState game, string playerId)
     {
         var own = game.ProvincesOf(playerId).ToHashSet();
+        var anywhere = IsLastRound(game);
         return game.Owners
             .Where(o => o.Value is { } owner && owner != playerId && !game.GetPlayer(owner).IsEliminated)
             .Select(o => o.Key)
-            .Where(id => map.NeighborsOf(id).Any(own.Contains))
+            .Where(id => anywhere || map.NeighborsOf(id).Any(own.Contains))
             .ToList();
     }
+
+    /// <summary>The last conquest round: the final chance to attack, so the usual border rule is lifted.</summary>
+    public static bool IsLastRound(GameState game) =>
+        game.Phase == GamePhase.Conquest && game.Round >= game.Settings.ConquestRounds;
 
     public void Attack(GameState game, string playerId, string provinceId)
     {
         Require(game.Phase == GamePhase.Conquest && game.Battle is null && game.Question is null, "Сега не може да се напада.");
         RequireTurn(game, playerId);
-        Require(AttackTargets(game, playerId).Contains(provinceId), "Можеш да нападаш само съседни вражески области.");
+        Require(AttackTargets(game, playerId).Contains(provinceId),
+            IsLastRound(game) ? "Можеш да нападаш само вражески области." : "Можеш да нападаш само съседни вражески области.");
 
         var attacker = game.GetPlayer(playerId);
         var defender = game.GetPlayer(game.Owners[provinceId]!);
@@ -233,6 +264,7 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
                 game.Round++;
                 if (game.Round > game.Settings.ConquestRounds) break;
                 Log(game, $"Рунд {game.Round} от {game.Settings.ConquestRounds}.");
+                if (IsLastRound(game)) Log(game, "Последен рунд: всеки може да нападне която и да е вражеска област!");
                 ShuffleTurnOrder(game);
             }
 
@@ -251,14 +283,20 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
         Finish(game);
     }
 
-    private void ApplyBattle(GameState game, bool attackerWon)
+    /// <param name="defended">The defender answered right and kept the land – worth <see cref="GameSettings.DefensePoints"/>.</param>
+    private void ApplyBattle(GameState game, bool attackerWon, bool defended = false)
     {
         var battle = game.Battle!;
         var attacker = game.GetPlayer(battle.AttackerId);
         var defender = game.GetPlayer(battle.DefenderId);
         var province = map[battle.ProvinceId].Name;
 
-        if (!attackerWon)
+        if (!attackerWon && defended)
+        {
+            defender.BonusPoints += game.Settings.DefensePoints;
+            Log(game, $"{defender.Name} удържа {province} (+{game.Settings.DefensePoints} т. за защита).");
+        }
+        else if (!attackerWon)
         {
             Log(game, $"{defender.Name} удържа {province}.");
         }
@@ -274,6 +312,15 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
             defender.Towers--;
             Log(game, $"{attacker.Name} събори кула на замъка на {defender.Name} (остават {defender.Towers}).");
             if (defender.Towers <= 0) Eliminate(game, defender, attacker);
+            else if (AttackTargets(game, attacker.Id).Count > 0)
+            {
+                // A tower fell: the attacker keeps the turn and may press on against the capital.
+                game.Battle = null;
+                game.Question = null;
+                Log(game, $"{attacker.Name} продължава хода си и може да атакува отново!");
+                StartTurnTimer(game);
+                return;
+            }
         }
 
         game.Battle = null;
@@ -337,10 +384,18 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
 
         // A battle (and its tiebreak) asks from the theme the attacker picked with the "Тема" lifeline.
         var theme = purpose == QuestionPurpose.Distribution ? null : game.Battle?.Category;
-        if (purpose == QuestionPurpose.Battle) Fill(game, round, theme is null ? questions.NextChoice() : questions.NextChoice(theme));
-        else Fill(game, round, theme is null ? questions.NextNumeric() : questions.NextNumeric(theme));
+        var levels = QuestionLevels(game.Difficulty);
+        if (purpose == QuestionPurpose.Battle) Fill(game, round, questions.NextChoice(theme, levels));
+        else Fill(game, round, questions.NextNumeric(theme, levels));
         game.Question = round;
     }
+
+    private static IReadOnlyCollection<QuestionDifficulty>? QuestionLevels(GameDifficulty? difficulty) => difficulty switch
+    {
+        GameDifficulty.Easy => [QuestionDifficulty.Easy, QuestionDifficulty.Medium],
+        GameDifficulty.Hard => [QuestionDifficulty.Medium, QuestionDifficulty.Hard],
+        _ => null,
+    };
 
     private void Fill(GameState game, QuestionRound round, ChoiceQuestion q)
     {
@@ -373,6 +428,7 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
     public void AnswerNumeric(GameState game, string playerId, double value)
     {
         Require(double.IsFinite(value), "Невалиден отговор.");
+        Require(value == Math.Floor(value), "Отговорът трябва да е цяло число.");
         var q = RequireOpenQuestion(game, playerId, QuestionKind.Numeric);
         q.Answers[playerId] = new SubmittedAnswer { Number = value, ResponseMs = ElapsedMs(q) };
         if (q.Participants.All(q.Answers.ContainsKey)) ResolveQuestion(game);
@@ -448,13 +504,14 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
                 }
                 else
                 {
-                    ApplyBattle(game, outcome == BattleOutcome.AttackerWins);
+                    ApplyBattle(game, outcome == BattleOutcome.AttackerWins, defended: q.CorrectPlayers.Contains(battle.DefenderId));
                 }
                 break;
 
             case QuestionPurpose.BattleTiebreak:
                 var best = q.Ranking[0];
-                ApplyBattle(game, best == game.Battle!.AttackerId && q.Answers.ContainsKey(best));
+                var attackerWon = best == game.Battle!.AttackerId && q.Answers.ContainsKey(best);
+                ApplyBattle(game, attackerWon, defended: !attackerWon && q.Answers.ContainsKey(game.Battle.DefenderId));
                 break;
         }
     }
@@ -503,8 +560,15 @@ public sealed partial class GameEngine(GameMap map, IQuestionProvider questions,
                 ClaimProvince(game, playerId, PickRandom(ClaimOptions(game, playerId)));
                 break;
             case GamePhase.Conquest:
-                Log(game, $"Времето на {player.Name} изтече – ходът е пропуснат.");
-                AdvanceTurn(game);
+                var targets = AttackTargets(game, playerId);
+                if (targets.Count == 0)
+                {
+                    Log(game, $"Времето на {player.Name} изтече – ходът е пропуснат.");
+                    AdvanceTurn(game);
+                    break;
+                }
+                Log(game, $"Времето на {player.Name} изтече – играта атакува случайна област.");
+                Attack(game, playerId, PickRandom(targets));
                 break;
         }
     }

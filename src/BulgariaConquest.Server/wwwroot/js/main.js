@@ -83,14 +83,43 @@ function render() {
   $("#lobby-hint").textContent = enough
     ? isHost ? "Всички са тук – стартирай играта!" : "Изчакваме създателя да стартира играта."
     : `Изпрати кода на приятели. Нужни са ${settings.minPlayers} играчи (${game.players.length}/${settings.maxPlayers}).`;
+  renderLobby(isHost, inLobby);
   $("#new-game-btn").hidden = game.phase !== "finished";
   $("#copy-link-btn").hidden = game.players.some((p) => p.botLevel);
   // The code card is only needed while gathering players and after the end; mid-game the map gets the room.
   $("#game-panel").hidden = !inLobby && game.phase !== "finished";
 }
 
+const DIFFICULTY = { easy: "Лесна", hard: "Трудна" };
+
+/** Lobby card: the players so far, with a kick button and "add bot" for the host. */
+function renderLobby(isHost, inLobby) {
+  $("#game-difficulty").textContent = game.difficulty ? `Трудност: ${DIFFICULTY[game.difficulty]}` : "";
+  const list = $("#lobby-players");
+  list.hidden = !inLobby;
+  $("#add-bot-btn").hidden = !(inLobby && isHost && game.players.length < settings.maxPlayers);
+  if (!inLobby) return list.replaceChildren();
+  list.replaceChildren(
+    ...game.players.map((p, i) =>
+      ui.h(
+        "li",
+        { class: "lobby-player", style: `--player-color:${p.color}` },
+        ui.h("span", { class: "dot" }),
+        ui.h("span", { class: "lobby-name" }, p.name, p.botLevel ? ui.h("span", { class: "muted" }, " · бот") : null, i === 0 ? ui.h("span", { class: "muted" }, " · домакин") : null, p.id === me() ? ui.h("span", { class: "muted" }, " · ти") : null),
+        isHost && p.id !== me()
+          ? ui.h("button", { type: "button", class: "kick-btn", title: `Премахни ${p.name}`, "aria-label": `Премахни ${p.name}`, onclick: () => call("KickPlayer", session.gameId, session.token, p.id) }, "✕")
+          : null
+      )
+    )
+  );
+}
+
 function apply(view) {
   if (game && view.id === game.id && view.version < game.version) return; // stale update
+  if (session && view.id === session.gameId && view.phase === "lobby" && !view.players.some((p) => p.id === session.playerId)) {
+    ui.toast("Домакинът те премахна от лобито.");
+    return leaveGame();
+  }
   game = view;
   clockOffset = Date.parse(view.serverNow) - Date.now();
   ui.setClockOffset(clockOffset);
@@ -321,7 +350,7 @@ $("#create-form").addEventListener("submit", async (e) => {
   const name = playerNameInput();
   if (!name) return;
   try {
-    enterGame(await conn.invoke("CreateGame", name));
+    enterGame(await conn.invoke("CreateGame", name, difficulty()));
   } catch (err) {
     ui.toast(friendlyError(err));
   }
@@ -345,14 +374,23 @@ $("#bot-form").addEventListener("submit", async (e) => {
   const name = playerNameInput();
   if (!name) return;
   try {
-    const level = document.querySelector('input[name="bot-level"]:checked')?.value ?? "normal";
-    enterGame(await conn.invoke("CreateBotGame", name, level));
+    enterGame(await conn.invoke("CreateBotGame", name, difficulty()));
   } catch (err) {
     ui.toast(friendlyError(err));
   }
 });
 
 $("#start-btn").addEventListener("click", () => session && call("StartGame", session.gameId, session.token));
+$("#add-bot-btn").addEventListener("click", () => session && call("AddBot", session.gameId, session.token));
+
+const difficulty = () => document.querySelector('input[name="difficulty"]:checked')?.value ?? "easy";
+
+// Questions are not for copying: no selecting, copying or context menu on the question card.
+for (const type of ["copy", "cut", "contextmenu", "dragstart", "selectstart"]) {
+  $("#question").addEventListener(type, (e) => {
+    if (!(e.target instanceof HTMLInputElement)) e.preventDefault();
+  });
+}
 $("#new-game-btn").addEventListener("click", leaveGame);
 
 $("#leave-btn").addEventListener("click", () => {

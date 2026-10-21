@@ -58,13 +58,13 @@
               <input id="player-name" maxlength="20" autocomplete="nickname" placeholder="напр. Хан Крум" />
             </label>
 
+            <span class="field-label">Трудност</span>
+            <div class="choice-pills" role="radiogroup" aria-label="Трудност на играта">
+              <label title="Лесни и средни въпроси, по-слаби ботове"><input type="radio" name="difficulty" value="easy" checked /><span>Лесна</span></label>
+              <label title="Средни и трудни въпроси, силни ботове"><input type="radio" name="difficulty" value="hard" /><span>Трудна</span></label>
+            </div>
+
             <form id="bot-form" class="mode-pane" data-mode="bots">
-              <span class="field-label">Трудност</span>
-              <div class="choice-pills" role="radiogroup" aria-label="Трудност на ботовете">
-                <label><input type="radio" name="bot-level" value="easy" /><span>Лесни</span></label>
-                <label><input type="radio" name="bot-level" value="normal" checked /><span>Нормални</span></label>
-                <label><input type="radio" name="bot-level" value="hard" /><span>Трудни</span></label>
-              </div>
               <button class="btn-cta wide">Започни битката <span class="cta-arrow" aria-hidden="true">›</span></button>
             </form>
 
@@ -140,7 +140,7 @@
             </article>
             <article class="rule-card">
               <span class="rule-icon" aria-hidden="true">♜</span>
-              <div><h4>Точки</h4><p>200 за област, 400 за превзета в битка, 1000 за замък – и за руините на паднала столица.</p></div>
+              <div><h4>Точки</h4><p>200 за област, 400 за превзета в битка, 100 за успешна защита, 1000 за замък – и за руините на паднала столица.</p></div>
             </article>
           </div>
         </div>
@@ -168,7 +168,7 @@
             </details>
             <details>
               <summary>Колко трудни са ботовете?</summary>
-              <p>Лесните отговарят вярно около 45% от времето, нормалните – 65%, трудните – 85%. Бързият човек може да ги изпревари.</p>
+              <p>При лесна игра ботовете отговарят вярно около 45% от времето, при трудна – около 85%. Бързият човек може да ги изпревари.</p>
             </details>
             <details>
               <summary>Как се печели?</summary>
@@ -243,6 +243,9 @@
           </div>
           <button type="button" id="copy-link-btn" class="btn-glass small">Покани</button>
         </div>
+        <p id="game-difficulty" class="small game-difficulty"></p>
+        <ul id="lobby-players" class="lobby-players"></ul>
+        <button type="button" id="add-bot-btn" class="btn-glass wide small" hidden>+ Добави бот</button>
         <p id="lobby-hint" class="small"></p>
         <button type="button" id="start-btn" class="btn-cta wide" hidden>Започни играта <span class="cta-arrow" aria-hidden="true">›</span></button>
         <button type="button" id="new-game-btn" class="btn-glass wide" hidden>Нова игра</button>

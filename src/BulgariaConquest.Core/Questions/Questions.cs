@@ -29,6 +29,16 @@ public interface IQuestionProvider
     /// <summary>Next question from one category.</summary>
     NumericQuestion NextNumeric(string category) => NextNumeric();
     ChoiceQuestion NextChoice(string category) => NextChoice();
+
+    /// <summary>
+    /// Next question of one of the given difficulties (null = any), optionally from one category.
+    /// Providers without difficulty data ignore <paramref name="levels"/>.
+    /// </summary>
+    NumericQuestion NextNumeric(string? category, IReadOnlyCollection<QuestionDifficulty>? levels) =>
+        category is null ? NextNumeric() : NextNumeric(category);
+
+    ChoiceQuestion NextChoice(string? category, IReadOnlyCollection<QuestionDifficulty>? levels) =>
+        category is null ? NextChoice() : NextChoice(category);
 }
 
 /// <summary>
@@ -46,6 +56,8 @@ public sealed class QuestionBank : IQuestionProvider
     private readonly Queue<ChoiceQuestion> _choiceDeck = new();
     private readonly Dictionary<string, Queue<NumericQuestion>> _numericCategoryDecks = [];
     private readonly Dictionary<string, Queue<ChoiceQuestion>> _choiceCategoryDecks = [];
+    private readonly Dictionary<string, (Queue<NumericQuestion> Deck, List<NumericQuestion> Source)> _numericFilteredDecks = [];
+    private readonly Dictionary<string, (Queue<ChoiceQuestion> Deck, List<ChoiceQuestion> Source)> _choiceFilteredDecks = [];
     private readonly Lock _lock = new();
 
     public QuestionBank(IReadOnlyList<NumericQuestion> numeric, IReadOnlyList<ChoiceQuestion> choice, Random? random = null)
@@ -95,6 +107,47 @@ public sealed class QuestionBank : IQuestionProvider
         ChoiceQuestion q;
         lock (_lock) q = Draw(DeckFor(_choiceCategoryDecks, category), source);
         return Shuffled(q);
+    }
+
+    public NumericQuestion NextNumeric(string? category, IReadOnlyCollection<QuestionDifficulty>? levels)
+    {
+        if (levels is null) return category is null ? NextNumeric() : NextNumeric(category);
+        lock (_lock)
+        {
+            var (deck, source) = Filtered(_numericFilteredDecks, _numeric, category, levels, q => q.Category, q => q.Difficulty);
+            if (source.Count == 0) return category is null ? Draw(_numericDeck, _numeric) : NextNumericUnlocked(category);
+            return Draw(deck, source);
+        }
+    }
+
+    public ChoiceQuestion NextChoice(string? category, IReadOnlyCollection<QuestionDifficulty>? levels)
+    {
+        if (levels is null) return category is null ? NextChoice() : NextChoice(category);
+        ChoiceQuestion q;
+        lock (_lock)
+        {
+            var (deck, source) = Filtered(_choiceFilteredDecks, _choice, category, levels, x => x.Category, x => x.Difficulty);
+            if (source.Count == 0) return category is null ? NextChoice() : NextChoice(category);
+            q = Draw(deck, source);
+        }
+        return Shuffled(q);
+    }
+
+    private NumericQuestion NextNumericUnlocked(string category) =>
+        _numericByCategory.TryGetValue(category, out var source) ? Draw(DeckFor(_numericCategoryDecks, category), source) : Draw(_numericDeck, _numeric);
+
+    /// <summary>A deck of the questions matching a category (null = all) and a set of difficulties; built on first use.</summary>
+    private static (Queue<T> Deck, List<T> Source) Filtered<T>(
+        Dictionary<string, (Queue<T>, List<T>)> decks, IReadOnlyList<T> all, string? category,
+        IReadOnlyCollection<QuestionDifficulty> levels, Func<T, string?> categoryOf, Func<T, QuestionDifficulty> difficultyOf)
+    {
+        var key = $"{category}|{string.Join(",", levels.Order())}";
+        if (!decks.TryGetValue(key, out var entry))
+        {
+            var source = all.Where(q => (category is null || categoryOf(q) == category) && levels.Contains(difficultyOf(q))).ToList();
+            decks[key] = entry = (new Queue<T>(), source);
+        }
+        return entry;
     }
 
     private ChoiceQuestion Shuffled(ChoiceQuestion q)

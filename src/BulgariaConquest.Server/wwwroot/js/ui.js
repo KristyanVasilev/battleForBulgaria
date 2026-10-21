@@ -105,7 +105,7 @@ export function renderStatus(game, me) {
     text = {
       castleSelection: "Твой ход: избери област за замъка си.",
       distribution: `Твой ход: заеми ${game.picks[0]?.remaining ?? 1} свободна(и) област(и).`,
-      conquest: "Твой ход: нападни съседна вражеска област.",
+      conquest: game.isLastRound ? "Твой ход: последна атака – нападни която и да е вражеска област!" : "Твой ход: нападни съседна вражеска област.",
     }[game.phase];
   } else if (current) text = `Ход на ${playerName(game, current)}…`;
   else text = "";
@@ -162,7 +162,8 @@ export function renderAnnouncer(game, me, provinceName) {
       next = { key: `q|${q.startedAt}`, icon: "📜", title: "Въпрос за земите", sub: "Най-точният отговор избира пръв" };
     }
   } else if (game && !q && game.currentPlayerId && game.phase !== "finished" && game.phase !== "lobby") {
-    const turnKey = `${game.id}|${game.phase}|${game.currentPlayerId}`;
+    // In the battles every turn has its own deadline, so a second attack after a fallen tower is announced too.
+    const turnKey = `${game.id}|${game.phase}|${game.currentPlayerId}|${game.phase === "conquest" ? game.actionDeadline : ""}`;
     if (turnKey !== announce.turnKey) {
       announce.turnKey = turnKey;
       const mine = game.currentPlayerId === me;
@@ -172,7 +173,9 @@ export function renderAnnouncer(game, me, provinceName) {
         color: game.players.find((p) => p.id === game.currentPlayerId)?.color,
         icon: mine ? "♛" : "♜",
         title: mine ? "Твой ход!" : `Ход на ${playerName(game, game.currentPlayerId)}`,
-        sub: mine ? TURN_HINTS[game.phase] : game.phase === "conquest" ? `Рунд ${game.round} от ${game.maxRounds}` : "",
+        sub: game.isLastRound
+          ? mine ? "Последна атака: избери която и да е вражеска област" : "Последен рунд – атака навсякъде по картата"
+          : mine ? TURN_HINTS[game.phase] : game.phase === "conquest" ? `Рунд ${game.round} от ${game.maxRounds}` : "",
         mine,
       };
     }
@@ -656,12 +659,24 @@ export function renderQuestion(game, me, answer, provinceName) {
     );
   } else if (!q.revealed) {
     const locked = !isParticipant || hasAnswered;
-    const input = h("input", { type: "number", inputmode: "decimal", step: "any", placeholder: "Твоят отговор", disabled: locked });
+    // Whole numbers only: digits and a leading minus; "." and "," cannot even be typed.
+    const input = h("input", {
+      type: "text",
+      inputmode: "numeric",
+      autocomplete: "off",
+      placeholder: "Цяло число",
+      disabled: locked,
+      onkeydown: (e) => [".", ",", "e", "E", "+"].includes(e.key) && e.preventDefault(),
+      oninput: (e) => {
+        const clean = e.target.value.replace(/[^\d-]/g, "").replace(/(?!^)-/g, "");
+        if (clean !== e.target.value) e.target.value = clean;
+      },
+    });
     const button = h("button", { class: "btn-cta", disabled: locked }, "Отговори ", h("span", { class: "cta-arrow" }, "›"));
     const submit = () => {
       const value = Number(input.value);
       if (input.disabled) return;
-      if (input.value.trim() === "" || !Number.isFinite(value)) return toast("Въведи число.");
+      if (!/^-?\d+$/.test(input.value.trim()) || !Number.isSafeInteger(value)) return toast("Въведи цяло число.");
       input.disabled = button.disabled = true;
       answer("numeric", value);
     };

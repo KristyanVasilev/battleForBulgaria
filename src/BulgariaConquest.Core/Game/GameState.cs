@@ -15,6 +15,16 @@ public enum GamePhase
     Finished,
 }
 
+/// <summary>Chosen when the game is created: sets the questions asked and how strong the bots are.</summary>
+public enum GameDifficulty
+{
+    /// <summary>Easy and medium questions, easy bots.</summary>
+    Easy,
+
+    /// <summary>Medium and hard questions, hard bots.</summary>
+    Hard,
+}
+
 public enum QuestionKind
 {
     Numeric,
@@ -42,6 +52,9 @@ public sealed class GameState
 
     public GamePhase Phase { get; set; } = GamePhase.Lobby;
     public GameSettings Settings { get; set; } = new();
+
+    /// <summary>Null for games saved before difficulties existed: any question, bots as created.</summary>
+    public GameDifficulty? Difficulty { get; set; }
     public List<PlayerState> Players { get; set; } = [];
 
     /// <summary>Province id → owning player id (null = free land).</summary>

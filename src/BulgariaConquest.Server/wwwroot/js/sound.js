@@ -41,7 +41,10 @@ export function setMuted(value) {
 }
 
 /** One short tone with a fast attack and an exponential fade. */
+const VOLUME = 1.4; // overall loudness of every effect
+
 function tone(ac, { freq, at = 0, dur, vol, type = "sine", slideTo = null }) {
+  vol = Math.min(1, vol * VOLUME);
   const t = ac.currentTime + at;
   const osc = ac.createOscillator();
   const gain = ac.createGain();

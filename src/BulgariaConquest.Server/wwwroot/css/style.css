@@ -448,8 +448,9 @@ input:focus {
 
 .choice-pills {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 0.4rem;
+  margin: 0.4rem 0 1rem;
 }
 
 .choice-pills input {
@@ -3208,4 +3209,95 @@ input:focus {
     height: 2.1rem;
     font-size: 1.1rem;
   }
+}
+
+/* ---------------------------------------------------------------- lobby: players, kick, add bot */
+
+.game-difficulty {
+  margin: 0.35rem 0 0;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.game-difficulty:empty {
+  display: none;
+}
+
+.lobby-players {
+  list-style: none;
+  margin: 0.6rem 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.lobby-players:empty {
+  display: none;
+}
+
+.lobby-player {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.4rem 0.45rem 0.4rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-left: 4px solid var(--player-color);
+  font-weight: 600;
+}
+
+.lobby-player .dot {
+  flex: none;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--player-color);
+}
+
+.lobby-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lobby-name .muted {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.kick-btn {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(201, 88, 79, 0.5);
+  background: rgba(201, 88, 79, 0.15);
+  color: #ff8a7e;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.kick-btn:hover {
+  background: var(--bad);
+  color: var(--ink);
+}
+
+#add-bot-btn {
+  margin-bottom: 0.4rem;
+}
+
+/* questions cannot be selected or copied (the answer field still can) */
+.question-card {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.question-card input {
+  user-select: text;
+  -webkit-user-select: text;
 }

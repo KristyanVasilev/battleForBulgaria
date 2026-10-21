@@ -11,6 +11,7 @@
   "territoryPoints": 200,
   "conqueredTerritoryPoints": 400,
   "castlePoints": 1000,
+  "defensePoints": 100,
   "ruinedCastlePoints": 1000,
   "distributionPicks": [2, 1, 0],
   "requireAdjacentClaims": true,

@@ -31,30 +31,43 @@ public sealed class GameManager(
 
     private readonly ConcurrentDictionary<string, Session> _sessions = new();
 
-    public async Task<JoinResult> CreateAsync(string playerName)
+    public async Task<JoinResult> CreateAsync(string playerName, GameDifficulty difficulty)
     {
-        var state = engine.CreateGame(NewGameId(), settings);
+        var state = engine.CreateGame(NewGameId(), settings, difficulty);
         var player = engine.AddPlayer(state, playerName);
         await AddSessionAsync(state);
         return new JoinResult(state.Id, player.Id, player.Token);
     }
 
     /// <summary>Single-player game: the human plus bots fill the remaining seats; starts immediately.</summary>
-    public async Task<JoinResult> CreateBotGameAsync(string playerName, BotLevel level)
+    public async Task<JoinResult> CreateBotGameAsync(string playerName, GameDifficulty difficulty)
     {
-        var state = engine.CreateGame(NewGameId(), settings);
+        var state = engine.CreateGame(NewGameId(), settings, difficulty);
         var player = engine.AddPlayer(state, playerName);
-        var botNames = BotDirector.Names
-            .Where(n => !string.Equals(n, player.Name, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(_ => Random.Shared.Next())
-            .Take(settings.MaxPlayers - 1);
-        foreach (var name in botNames)
-            engine.AddPlayer(state, name, level);
+        while (state.Players.Count < settings.MaxPlayers)
+            engine.AddPlayer(state, FreeBotName(state), BotLevelFor(state));
         engine.Start(state, player.Id);
 
         await AddSessionAsync(state);
         return new JoinResult(state.Id, player.Id, player.Token);
     }
+
+    /// <summary>The host fills an empty lobby seat with a bot of the game's difficulty.</summary>
+    public Task AddBotAsync(string gameId, string token) =>
+        ActAsync(gameId, token, (game, hostId) => engine.AddBot(game, hostId, FreeBotName(game), BotLevelFor(game)));
+
+    private static BotLevel BotLevelFor(GameState game) => game.Difficulty switch
+    {
+        GameDifficulty.Easy => BotLevel.Easy,
+        GameDifficulty.Hard => BotLevel.Hard,
+        _ => BotLevel.Normal,
+    };
+
+    private static string FreeBotName(GameState game) =>
+        BotDirector.Names
+            .Where(n => !game.Players.Any(p => string.Equals(p.Name, n, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(_ => Random.Shared.Next())
+            .FirstOrDefault() ?? throw new GameRuleException("Няма свободни имена за ботове.");
 
     private string NewGameId()
     {

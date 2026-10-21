@@ -34,7 +34,10 @@ public sealed record StaticData(GameMap Map, QuestionBank Questions, GameSetting
     public static StaticData Load(string dataDirectory)
     {
         var map = new GameMap(Json.Read<ProvinceFile>(Path.Combine(dataDirectory, "provinces.json")).Provinces);
-        var numeric = Json.Read<List<NumericQuestion>>(Path.Combine(dataDirectory, "questions", "numeric.json"));
+        // Answers are typed as whole numbers, so questions with a fractional answer are left out.
+        var numeric = Json.Read<List<NumericQuestion>>(Path.Combine(dataDirectory, "questions", "numeric.json"))
+            .Where(q => q.Answer == Math.Floor(q.Answer))
+            .ToList();
         var choice = Json.Read<List<ChoiceQuestion>>(Path.Combine(dataDirectory, "questions", "choice.json"));
         var settings = Json.Read<GameSettings>(Path.Combine(dataDirectory, "game-settings.json"));
         return new StaticData(map, new QuestionBank(numeric, choice), settings);

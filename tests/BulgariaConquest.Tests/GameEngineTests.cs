@@ -82,6 +82,7 @@ public class GameEngineTests
             attackers.Add(_engine.CurrentPlayerId(_game)!);
             SkipTurn();
         }
+        Assert.DoesNotContain(null, attackers);
 
         Assert.Equal(30, _game.RoundOrders.Count);
         foreach (var order in _game.RoundOrders)
@@ -117,14 +118,15 @@ public class GameEngineTests
         Assert.Equal(p1Before + 400, _engine.Score(_game, "p1"));
         Assert.Single(_game.ConqueredProvinces);
 
-        // A failed attack changes nothing.
+        // A failed attack keeps the province's value; the defender only earns the defence bonus.
         while (_engine.CurrentPlayerId(_game) != "p2") SkipTurn();
         _engine.Attack(_game, "p2", "b");
         _engine.AnswerChoice(_game, "p2", FixedQuestions.Wrong);
         _engine.AnswerChoice(_game, "p1", FixedQuestions.Correct);
         FinishReveal();
         Assert.Equal("p1", _game.Owners["b"]);
-        Assert.Equal(p1Before + 400, _engine.Score(_game, "p1"));
+        Assert.Equal(400, _engine.ProvincePoints(_game, "b"));
+        Assert.Equal(p1Before + 400 + 100, _engine.Score(_game, "p1"));
     }
 
     [Fact]
@@ -219,6 +221,133 @@ public class GameEngineTests
     }
 
     [Fact]
+    public void Defender_who_answers_right_and_holds_gets_100_points()
+    {
+        StartConquest();
+        var before = _engine.Score(_game, "p2");
+
+        while (_engine.CurrentPlayerId(_game) != "p1") SkipTurn();
+        _engine.Attack(_game, "p1", "b");
+        _engine.AnswerChoice(_game, "p1", FixedQuestions.Wrong);
+        _engine.AnswerChoice(_game, "p2", FixedQuestions.Correct);
+        FinishReveal();
+        Assert.Equal(before + 100, _engine.Score(_game, "p2"));
+
+        // Both wrong: the province is kept, but that is no real defence – no bonus.
+        while (_engine.CurrentPlayerId(_game) != "p1") SkipTurn();
+        _engine.Attack(_game, "p1", "b");
+        _engine.AnswerChoice(_game, "p1", FixedQuestions.Wrong);
+        _engine.AnswerChoice(_game, "p2", FixedQuestions.Wrong);
+        FinishReveal();
+        Assert.Equal(before + 100, _engine.Score(_game, "p2"));
+
+        // Winning the numeric tiebreak is a defence too.
+        while (_engine.CurrentPlayerId(_game) != "p1") SkipTurn();
+        _engine.Attack(_game, "p1", "b");
+        _engine.AnswerChoice(_game, "p1", FixedQuestions.Correct);
+        _engine.AnswerChoice(_game, "p2", FixedQuestions.Correct);
+        FinishReveal();
+        _engine.AnswerNumeric(_game, "p1", 150);
+        _engine.AnswerNumeric(_game, "p2", 101);
+        FinishReveal();
+        Assert.Equal("p2", _game.Owners["b"]);
+        Assert.Equal(before + 200, _engine.Score(_game, "p2"));
+    }
+
+    [Fact]
+    public void Knocking_down_a_tower_keeps_the_turn_for_another_attack()
+    {
+        StartConquest();
+        _game.Owners["d"] = "p1"; // p1 borders p3's castle in e
+
+        while (_engine.CurrentPlayerId(_game) != "p1") SkipTurn();
+        _engine.Attack(_game, "p1", "e");
+        _engine.AnswerChoice(_game, "p1", FixedQuestions.Correct);
+        _engine.AnswerChoice(_game, "p3", FixedQuestions.Wrong);
+        FinishReveal();
+
+        Assert.Equal(2, _game.GetPlayer("p3").Towers);
+        Assert.Equal("p1", _engine.CurrentPlayerId(_game));
+        _engine.Attack(_game, "p1", "e"); // straight at the capital again
+        Assert.True(_game.Battle!.IsCastle);
+    }
+
+    [Fact]
+    public void When_the_attack_time_runs_out_the_game_attacks_for_the_player()
+    {
+        StartConquest();
+        var attacker = _engine.CurrentPlayerId(_game)!;
+        var targets = _engine.AttackTargets(_game, attacker);
+
+        _time.Advance(TimeSpan.FromSeconds(_game.Settings.TurnSeconds + 1));
+        Assert.True(_engine.Tick(_game));
+
+        Assert.Equal(attacker, _game.Battle!.AttackerId);
+        Assert.Contains(_game.Battle.ProvinceId, targets);
+        Assert.Equal(QuestionPurpose.Battle, _game.Question!.Purpose);
+    }
+
+    [Fact]
+    public void In_the_last_round_any_enemy_province_can_be_attacked()
+    {
+        _game.Settings = _game.Settings with { ConquestRounds = 2 };
+        StartConquest();
+        while (_engine.CurrentPlayerId(_game) != "p1") SkipTurn();
+        Assert.Equal(["b", "e"], _engine.AttackTargets(_game, "p1").Order()); // only its neighbours
+
+        while (_game.Round < 2 || _engine.CurrentPlayerId(_game) != "p1") SkipTurn();
+        Assert.Equal(["b", "c", "d", "e"], _engine.AttackTargets(_game, "p1").Order());
+        _engine.Attack(_game, "p1", "c"); // far away, p2's castle
+        Assert.Equal("c", _game.Battle!.ProvinceId);
+    }
+
+    [Fact]
+    public void Numeric_answers_must_be_whole_numbers()
+    {
+        PlaceCastles();
+        var ex = Assert.Throws<GameRuleException>(() => _engine.AnswerNumeric(_game, "p1", 99.5));
+        Assert.Contains("цяло число", ex.Message);
+        _engine.AnswerNumeric(_game, "p1", -5);
+    }
+
+    [Fact]
+    public void Host_can_kick_players_and_add_bots_in_the_lobby()
+    {
+        var game = _engine.CreateGame("LOBBY", new GameSettings(), GameDifficulty.Hard);
+        _engine.AddPlayer(game, "Домакин");
+        _engine.AddPlayer(game, "Гост");
+        _engine.AddPlayer(game, "Друг");
+
+        Assert.Throws<GameRuleException>(() => _engine.KickPlayer(game, "p2", "p3")); // only the host
+        Assert.Throws<GameRuleException>(() => _engine.KickPlayer(game, "p1", "p1"));
+        _engine.KickPlayer(game, "p1", "p2");
+        Assert.Equal(["p1", "p3"], game.Players.Select(p => p.Id));
+
+        var bot = _engine.AddBot(game, "p1", "Хан Крум", BotLevel.Hard);
+        Assert.Equal("p4", bot.Id); // ids are never reused
+        Assert.Equal(3, game.Players.Select(p => p.Color).Distinct().Count());
+        Assert.Throws<GameRuleException>(() => _engine.AddBot(game, "p1", "Цар Симеон", BotLevel.Hard)); // full
+
+        _engine.Start(game, "p1");
+        Assert.Throws<GameRuleException>(() => _engine.KickPlayer(game, "p1", "p3"));
+    }
+
+    [Fact]
+    public void Game_difficulty_picks_the_questions()
+    {
+        var numeric = new[]
+        {
+            new NumericQuestion("e", "Лесен?", 1, Difficulty: QuestionDifficulty.Easy),
+            new NumericQuestion("h", "Труден?", 2, Difficulty: QuestionDifficulty.Hard),
+        };
+        var choice = new[] { new ChoiceQuestion("c", "Кое?", ["а", "б", "в", "г"], 0) };
+        var bank = new QuestionBank(numeric, choice, new Random(1));
+
+        Assert.All(Enumerable.Range(0, 5), _ => Assert.Equal("h", bank.NextNumeric(null, [QuestionDifficulty.Medium, QuestionDifficulty.Hard]).Id));
+        Assert.All(Enumerable.Range(0, 5), _ => Assert.Equal("e", bank.NextNumeric(null, [QuestionDifficulty.Easy, QuestionDifficulty.Medium]).Id));
+    }
+
+    [Fact]
     public void Timeout_picks_a_castle_automatically()
     {
         _time.Advance(TimeSpan.FromSeconds(_game.Settings.TurnSeconds + 1));
@@ -276,9 +405,18 @@ public class GameEngineTests
         Assert.True(_engine.Tick(_game));
     }
 
+    /// <summary>
+    /// The current player lets the clock run out. In the battles the game then attacks for them; nobody
+    /// answers, so the defender holds and the turn passes on.
+    /// </summary>
     private void SkipTurn()
     {
         _time.Advance(TimeSpan.FromSeconds(_game.Settings.TurnSeconds + 1));
         Assert.True(_engine.Tick(_game));
+        while (_game.Phase == GamePhase.Conquest && _game.Question is not null)
+        {
+            _time.Advance(TimeSpan.FromSeconds(30));
+            Assert.True(_engine.Tick(_game));
+        }
     }
 }
