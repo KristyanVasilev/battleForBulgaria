@@ -3301,3 +3301,52 @@ input:focus {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* ---------------------------------------------------------------- phones and tablets: easy on the GPU and the battery
+   SVG filters are redrawn every time anything on the map moves, backdrop blur recomposites everything under
+   a panel, and endless animations keep the GPU busy every frame – together they heat a phone up. Here the
+   map keeps all its information but stands still between events; one-off animations (pops, the sword's
+   flight, captures) still play. */
+@media (max-width: 1000px), (pointer: coarse) {
+  .land,
+  .castle,
+  .sword,
+  .attack-trail,
+  .capital-name rect {
+    filter: none;
+  }
+
+  .hud,
+  .question {
+    backdrop-filter: none;
+  }
+
+  .province.is-turn {
+    animation: none;
+    filter: brightness(1.15) saturate(1.1);
+  }
+
+  .outline-target,
+  .outline-battle,
+  .attack-trail,
+  .round.is-current .round-lamp,
+  .round-turns i.is-now,
+  .turn-row.is-now .turn-mark,
+  .turn-crest::after,
+  .status-pill.is-mine,
+  .castle.is-turn .castle-aura,
+  .plate.is-current::before,
+  .attack.is-struck .sword-body,
+  .announce.is-intro .announce-icon,
+  .joker.is-ready .joker-face {
+    animation: none;
+  }
+
+  .status-pill.is-mine.is-passing {
+    animation: pill-pop 0.6s cubic-bezier(0.2, 1.6, 0.4, 1);
+  }
+
+  .attack.is-struck .attack-impact {
+    animation-iteration-count: 2;
+  }
+}

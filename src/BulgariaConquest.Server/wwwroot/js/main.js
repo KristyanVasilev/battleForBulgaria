@@ -120,11 +120,44 @@ function apply(view) {
     ui.toast("Домакинът те премахна от лобито.");
     return leaveGame();
   }
+  const prev = game;
   game = view;
   clockOffset = Date.parse(view.serverNow) - Date.now();
   ui.setClockOffset(clockOffset);
   render();
   questionClock();
+  playEffects(prev, view);
+}
+
+/** Sound effects for what changed between two updates of the same game. */
+function playEffects(prev, next) {
+  if (!prev || prev.id !== next.id || next.version <= prev.version) return;
+  const mine = me();
+
+  const pb = prev.battle;
+  const nb = next.battle;
+  if (nb && (!pb || pb.attackerId !== nb.attackerId || pb.provinceId !== nb.provinceId)) sound.attack();
+
+  // How a battle ended: a tower fell, the province changed hands, or it held.
+  const towerFell = next.players.some((p) => (prev.players.find((o) => o.id === p.id)?.towers ?? p.towers) > p.towers);
+  const captured = Object.entries(next.owners).some(([id, owner]) => owner && prev.owners[id] && prev.owners[id] !== owner);
+  if (towerFell) sound.towerFall();
+  else if (captured) sound.capture();
+  else if (pb && !nb) sound.defended();
+
+  // My own answer, the moment the result is shown.
+  const pq = prev.question;
+  const nq = next.question;
+  if (pq && nq && pq.startedAt === nq.startedAt && !pq.revealed && nq.revealed && nq.answers?.[mine]) {
+    if (nq.kind === "choice") nq.correctPlayers.includes(mine) ? sound.correct() : sound.wrong();
+    else if (nq.ranking[0] === mine) sound.correct();
+    else if (nq.ranking.at(-1) === mine) sound.wrong();
+  }
+
+  const myTurn = next.currentPlayerId === mine;
+  if (myTurn && (prev.currentPlayerId !== mine || (next.phase === "conquest" && prev.actionDeadline !== next.actionDeadline))) sound.yourTurn();
+
+  if (prev.phase !== "finished" && next.phase === "finished") sound.gameOver(next.winnerId === mine);
 }
 
 conn.onUpdate((view) => {
@@ -158,6 +191,8 @@ const clock = { key: null, second: null, gong: false, seenRunning: false };
  */
 function questionClock() {
   const q = game?.question;
+  // Tense music while the answer time runs (not during the intro or the result).
+  sound.setTension(!!q && !q.revealed && !ui.inIntro(q) && ui.secondsLeft(q.deadline, clockOffset) > 0);
   if (!q) return;
 
   const key = `${game.id}|${q.startedAt}`;

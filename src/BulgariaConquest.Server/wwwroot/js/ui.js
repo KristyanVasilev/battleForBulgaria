@@ -329,6 +329,14 @@ export function renderScoreboard(game, me) {
   });
   places.forEach((place, i) => (places[i] = place ?? places[i - 1]));
 
+  // Players kicked from the lobby lose their step.
+  const present = new Set(standings.map((p) => p.id));
+  for (const [id, plate] of plates) {
+    if (present.has(id)) continue;
+    plate.el.remove();
+    plates.delete(id);
+  }
+
   // FLIP: remember where each step was, so a change of places slides instead of jumping.
   const before = new Map([...plates].map(([id, plate]) => [id, plate.el.getBoundingClientRect().left]));
 
